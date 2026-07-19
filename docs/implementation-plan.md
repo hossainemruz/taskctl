@@ -291,10 +291,10 @@ internal/templates/defaults/review.md.tmpl
   - [x] **Status: Completed** — STEP-013: Implement configured viewer launch
   - [x] **Status: Completed** — STEP-014: Add Task/artifact CLI integration coverage
 - PR-005: Deliver structured planning and Markdown projection
-  - [ ] **Status: Pending** — STEP-015: Implement plan input and heading validation
-  - [ ] **Status: Pending** — STEP-016: Implement bounded Progress rendering
-  - [ ] **Status: Pending** — STEP-017: Implement plan apply and safe metadata correction
-  - [ ] **Status: Pending** — STEP-018: Implement append-only PR/Step evolution and list commands
+  - [x] **Status: Completed** — STEP-015: Implement plan input and heading validation
+  - [x] **Status: Completed** — STEP-016: Implement bounded Progress rendering
+  - [x] **Status: Completed** — STEP-017: Implement plan apply and safe metadata correction
+  - [x] **Status: Completed** — STEP-018: Implement append-only PR/Step evolution and list commands
 - PR-006: Deliver PR and Step execution lifecycle
   - [ ] **Status: Pending** — STEP-019: Implement PR start and branch association
   - [ ] **Status: Pending** — STEP-020: Implement Step selection and `step get` JSON
@@ -647,7 +647,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-015: Implement plan input and heading validation
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Validate the machine hierarchy against user-readable prose.
 - **Related requirements:** R8, R9, R15.
 - **Changes:**
@@ -663,7 +663,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-016: Implement bounded Progress rendering
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Project canonical state into Typora-visible Markdown safely.
 - **Related requirements:** R5, R9, R15.
 - **Changes:**
@@ -678,7 +678,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-017: Implement plan apply and safe metadata correction
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Support draft iteration without allowing execution history loss.
 - **Related requirements:** R8, R9, R15.
 - **Changes:**
@@ -694,7 +694,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-018: Implement append-only PR/Step evolution and list commands
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Support implementation discoveries and final-review correction
   Steps without reopening bulk plan replacement.
 - **Related requirements:** R8, R13.

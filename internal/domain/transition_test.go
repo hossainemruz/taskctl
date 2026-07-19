@@ -45,6 +45,91 @@ func TestReplaceDraftPlan(t *testing.T) {
 	}
 }
 
+func TestCorrectPlanTitlesPreservesExecutionStateAndEvolvedTopology(t *testing.T) {
+	t.Parallel()
+	task, err := NewTask("TASKCTL-001", "Task", "project", testCreated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := task.ReplaceDraftPlan(validPlan()); err != nil {
+		t.Fatal(err)
+	}
+	if err := task.StartPR("PR-001", "feat/storage", testStarted); err != nil {
+		t.Fatal(err)
+	}
+	correction, err := task.AddStep("PR-001", "Address final review")
+	if err != nil || correction != "STEP-004" {
+		t.Fatalf("AddStep() = %s, %v", correction, err)
+	}
+	plan := planForTask(task)
+	plan.PRs[0].Title = "Revised storage"
+	plan.PRs[0].Steps[0].Title = "Revised schema"
+	if err := plan.Validate(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("initial-plan Validate() error = %v, want evolved traversal rejection", err)
+	}
+	startedAt := *task.PRs[0].StartedAt
+	if err := task.CorrectPlanTitles(plan); err != nil {
+		t.Fatalf("CorrectPlanTitles() error = %v", err)
+	}
+	if task.PRs[0].Title != "Revised storage" || task.PRs[0].Steps[0].Title != "Revised schema" {
+		t.Fatalf("corrected titles = %#v", task.PRs[0])
+	}
+	if task.PRs[0].Branch != "feat/storage" || !task.PRs[0].StartedAt.Equal(startedAt) || task.PRs[0].Steps[0].Status != StepPending {
+		t.Fatalf("execution state changed = %#v", task.PRs[0])
+	}
+	if err := task.Validate(); err != nil {
+		t.Fatalf("corrected Task is invalid: %v", err)
+	}
+}
+
+func TestCorrectPlanTitlesRejectsTopologyChangesWithoutMutation(t *testing.T) {
+	t.Parallel()
+	base := startedTask(StepPending, StepPending)
+	valid := planForTask(base)
+	tests := []struct {
+		name   string
+		mutate func(*Plan)
+	}{
+		{name: "delete Step", mutate: func(plan *Plan) { plan.PRs[0].Steps = plan.PRs[0].Steps[:1] }},
+		{name: "reorder Steps", mutate: func(plan *Plan) {
+			plan.PRs[0].Steps[0], plan.PRs[0].Steps[1] = plan.PRs[0].Steps[1], plan.PRs[0].Steps[0]
+		}},
+		{name: "replace PR", mutate: func(plan *Plan) {
+			plan.PRs = append(plan.PRs, PlannedPR{ID: "PR-002", Title: "Other", Steps: []PlannedStep{{ID: "STEP-003", Title: "Other"}}})
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			task := base.Clone()
+			before := task.Clone()
+			plan := valid
+			plan.PRs = append([]PlannedPR(nil), valid.PRs...)
+			for index := range plan.PRs {
+				plan.PRs[index].Steps = append([]PlannedStep(nil), valid.PRs[index].Steps...)
+			}
+			test.mutate(&plan)
+			if err := task.CorrectPlanTitles(plan); err == nil {
+				t.Fatal("CorrectPlanTitles() accepted topology change")
+			}
+			if !reflect.DeepEqual(task, before) {
+				t.Fatal("failed correction mutated Task")
+			}
+		})
+	}
+}
+
+func planForTask(task Task) Plan {
+	result := Plan{PRs: make([]PlannedPR, len(task.PRs))}
+	for prIndex, pr := range task.PRs {
+		result.PRs[prIndex] = PlannedPR{ID: pr.ID, Title: pr.Title, Steps: make([]PlannedStep, len(pr.Steps))}
+		for stepIndex, step := range pr.Steps {
+			result.PRs[prIndex].Steps[stepIndex] = PlannedStep{ID: step.ID, Title: step.Title}
+		}
+	}
+	return result
+}
+
 func TestAddPRAndStepAllocationAndReopening(t *testing.T) {
 	t.Parallel()
 	task := startedTask(StepCompleted)

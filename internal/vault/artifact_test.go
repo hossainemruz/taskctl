@@ -84,3 +84,44 @@ func TestRenderArtifactRejectsMalformedAndSymlinkTemplates(t *testing.T) {
 		t.Fatalf("symlink template error = %v", err)
 	}
 }
+
+func TestReadAndWriteArtifactReplaceAtomicallyAndPreserveMode(t *testing.T) {
+	t.Parallel()
+	store := newTestStore(t)
+	project := storeTestProject()
+	if err := store.CreateProject(project); err != nil {
+		t.Fatal(err)
+	}
+	task := storeTestTask("TASKCTL-001")
+	if err := store.CreateTaskWithMarkdown(task, []byte("task")); err != nil {
+		t.Fatal(err)
+	}
+	path, _, err := store.EnsureArtifact(project.ID, task.ID, ArtifactPlan, []byte("before"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := store.ReadArtifact(project.ID, task.ID, ArtifactPlan)
+	if err != nil || string(contents) != "before" {
+		t.Fatalf("ReadArtifact() = %q, %v", contents, err)
+	}
+	if err := store.WriteArtifact(project.ID, task.ID, ArtifactPlan, []byte("after")); err != nil {
+		t.Fatal(err)
+	}
+	contents, err = os.ReadFile(path)
+	if err != nil || string(contents) != "after" {
+		t.Fatalf("written artifact = %q, %v", contents, err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o640 {
+		t.Fatalf("written artifact mode = %v, want 0640", info.Mode().Perm())
+	}
+	if err := store.WriteArtifact(project.ID, task.ID, ArtifactReview, []byte("new")); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("WriteArtifact() missing error = %v, want ErrNotFound", err)
+	}
+}

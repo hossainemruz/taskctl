@@ -245,6 +245,9 @@ func validateTitle(path, title string) error {
 	if strings.ContainsRune(title, '\x00') {
 		return invalid(path, "contains a NUL byte")
 	}
+	if strings.ContainsAny(title, "\r\n") {
+		return invalid(path, "must be a single line")
+	}
 	return nil
 }
 

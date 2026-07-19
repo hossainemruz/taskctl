@@ -345,3 +345,76 @@ func TestTaskArtifactCLIWorkflow(t *testing.T) {
 		t.Fatalf("repository-local pointer exists: %v", err)
 	}
 }
+
+func TestPlanningCLIWorkflow(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	repository := filepath.Join(root, "repo")
+	if err := os.Mkdir(repository, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	environment := cliEnvironment{home: filepath.Join(root, "home"), working: repository, xdg: filepath.Join(root, "config")}
+	vaultPath := filepath.Join(root, "vault")
+	runner := &workflowRunner{}
+	run := func(stdin string, args ...string) (int, string, string) {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := Execute(context.Background(), Dependencies{Stdin: strings.NewReader(stdin), Stdout: &stdout, Stderr: &stderr,
+			Environment: environment, Processes: runner}, args)
+		return code, stdout.String(), stderr.String()
+	}
+	assertSuccess := func(stdin string, args ...string) string {
+		t.Helper()
+		code, stdout, stderr := run(stdin, args...)
+		if code != ExitSuccess || stderr != "" {
+			t.Fatalf("taskctl %v = %d, stdout = %q, stderr = %q", args, code, stdout, stderr)
+		}
+		return stdout
+	}
+
+	assertSuccess("", "init", "--vault", vaultPath, "--viewer", "typora", "--non-interactive")
+	assertSuccess("", "new", "Plan task", "--prefix", "PLAN", "--non-interactive")
+	planPath := strings.TrimSpace(assertSuccess("", "artifact", "ensure", "plan"))
+	contents, err := os.ReadFile(planPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents = []byte(strings.Replace(string(contents), "Use `### PR-NNN: Title`", "### PR-001: Storage\n\n#### STEP-001: Schema\n\nUse `### PR-NNN: Title`", 1))
+	if err := os.WriteFile(planPath, contents, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	input := `{"prs":[{"id":"PR-001","title":"Storage","steps":[{"id":"STEP-001","title":"Schema"}]}]}`
+	inputPath := filepath.Join(root, "plan.json")
+	if err := os.WriteFile(inputPath, []byte(input), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if stdout := assertSuccess("", "plan", "apply", "--file", inputPath); !strings.Contains(stdout, "1 PRs, 1 Steps") {
+		t.Fatalf("plan apply stdout = %q", stdout)
+	}
+	assertSuccess(input, "plan", "apply")
+	if output := assertSuccess("", "pr", "list", "--json"); !strings.Contains(output, `"id": "PR-001"`) || !strings.Contains(output, `"total": 1`) {
+		t.Fatalf("pr list JSON = %q", output)
+	}
+	if output := strings.TrimSpace(assertSuccess("", "step", "list", "--json")); !strings.HasPrefix(output, "[") || !strings.Contains(output, `"pr_id": "PR-001"`) {
+		t.Fatalf("step list JSON = %q", output)
+	}
+	if got := strings.TrimSpace(assertSuccess("", "step", "add", "--pr", "PR-001", "--title", "Persistence")); got != "STEP-002" {
+		t.Fatalf("step add stdout = %q", got)
+	}
+	if got := strings.TrimSpace(assertSuccess("", "pr", "add", "--title", "CLI")); got != "PR-002" {
+		t.Fatalf("pr add stdout = %q", got)
+	}
+	if got := strings.TrimSpace(assertSuccess("", "step", "add", "--pr", "PR-002", "--title", "Commands")); got != "STEP-003" {
+		t.Fatalf("step add second PR stdout = %q", got)
+	}
+	assertSuccess("", "pr", "skip", "PR-002", "--reason", "deferred")
+	projected, err := os.ReadFile(planPath)
+	if err != nil || !strings.Contains(string(projected), "PR-002: CLI — Skipped") {
+		t.Fatalf("projected plan = %q, error = %v", projected, err)
+	}
+
+	code, _, stderr := run("", "step", "add", "--pr", "PR-001")
+	if code != ExitUsage || !strings.Contains(stderr, "--title is required") {
+		t.Fatalf("missing title = %d, stderr = %q", code, stderr)
+	}
+}
