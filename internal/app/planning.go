@@ -126,27 +126,7 @@ func (w *Workflow) SkipPR(ctx context.Context, input ProjectInput, prValue, reas
 }
 
 func (w *Workflow) SkipStep(ctx context.Context, input ProjectInput, stepValue, reason string) (StepListItem, error) {
-	stepID, err := parseStepID(stepValue)
-	if err != nil {
-		return StepListItem{}, err
-	}
-	store, projects, resolved, markdown, err := w.planContext(ctx, input)
-	if err != nil {
-		return StepListItem{}, err
-	}
-	candidate := resolved.Task.Clone()
-	if err := candidate.SkipStep(stepID, reason); err != nil {
-		return StepListItem{}, planningDomainError("skip Step", err)
-	}
-	if err := persistPlanningMutation(store, projects, candidate, markdown); err != nil {
-		return StepListItem{}, err
-	}
-	for _, item := range stepListItems(candidate) {
-		if item.ID == stepID {
-			return item, nil
-		}
-	}
-	return StepListItem{}, NewError(ErrorInternal, "skipped Step %s disappeared from Task %s", stepID, candidate.ID)
+	return w.transitionStep(ctx, input, stepValue, stepSkip, reason)
 }
 
 func (w *Workflow) ListPRs(ctx context.Context, input ProjectInput) ([]PRListItem, error) {
@@ -218,7 +198,9 @@ func planningDomainError(operation string, err error) error {
 		return WrapError(ErrorNotFound, err, "%s: %v", operation, err)
 	case errors.Is(err, domain.ErrInvalidTransition):
 		return WrapError(ErrorConflict, err, "%s: %v", operation, err)
-	case errors.Is(err, domain.ErrInvalidState), errors.Is(err, domain.ErrInvalidID), errors.Is(err, domain.ErrIDOverflow):
+	case errors.Is(err, domain.ErrInvalidState):
+		return WrapError(ErrorInvalidData, err, "%s: %v", operation, err)
+	case errors.Is(err, domain.ErrInvalidID), errors.Is(err, domain.ErrIDOverflow):
 		return WrapError(ErrorUsage, err, "%s: %v", operation, err)
 	default:
 		return WrapError(ErrorInternal, err, "%s: %v", operation, err)

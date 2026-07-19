@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,6 +60,7 @@ func (panicRunner) Start(process.Command) error {
 type workflowRunner struct {
 	commands []process.Command
 	started  []process.Command
+	branch   string
 }
 
 func (r *workflowRunner) Run(_ context.Context, command process.Command) (process.Result, error) {
@@ -66,7 +68,11 @@ func (r *workflowRunner) Run(_ context.Context, command process.Command) (proces
 	if len(command.Args) > 0 && command.Args[0] == "config" {
 		return process.Result{Stdout: []byte("git@github.com:org/taskctl.git\n")}, nil
 	}
-	return process.Result{Stdout: []byte("main\n")}, nil
+	branch := r.branch
+	if branch == "" {
+		branch = "main\n"
+	}
+	return process.Result{Stdout: []byte(branch)}, nil
 }
 
 func (r *workflowRunner) Start(command process.Command) error {
@@ -417,4 +423,101 @@ func TestPlanningCLIWorkflow(t *testing.T) {
 	if code != ExitUsage || !strings.Contains(stderr, "--title is required") {
 		t.Fatalf("missing title = %d, stderr = %q", code, stderr)
 	}
+}
+
+func TestExecutionCLIWorkflowAndStepGetJSON(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	repository := filepath.Join(root, "repo")
+	if err := os.Mkdir(repository, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	environment := cliEnvironment{home: filepath.Join(root, "home"), working: repository, xdg: filepath.Join(root, "config")}
+	vaultPath := filepath.Join(root, "vault")
+	runner := &workflowRunner{}
+	run := func(stdin string, args ...string) (int, string, string) {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := Execute(context.Background(), Dependencies{Stdin: strings.NewReader(stdin), Stdout: &stdout, Stderr: &stderr,
+			Environment: environment, Processes: runner}, args)
+		return code, stdout.String(), stderr.String()
+	}
+	assertSuccess := func(stdin string, args ...string) string {
+		t.Helper()
+		code, stdout, stderr := run(stdin, args...)
+		if code != ExitSuccess || stderr != "" {
+			t.Fatalf("taskctl %v = %d, stdout = %q, stderr = %q", args, code, stdout, stderr)
+		}
+		return stdout
+	}
+
+	assertSuccess("", "init", "--vault", vaultPath, "--viewer", "typora", "--non-interactive")
+	assertSuccess("", "new", "Execution task", "--prefix", "EXEC", "--non-interactive")
+	planPath := strings.TrimSpace(assertSuccess("", "artifact", "ensure", "plan"))
+	contents, err := os.ReadFile(planPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents = []byte(strings.Replace(string(contents), "Use `### PR-NNN: Title`",
+		"### PR-001: Implementation\n\n#### STEP-001: Build lifecycle\n\nUse `### PR-NNN: Title`", 1))
+	if err := os.WriteFile(planPath, contents, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	structured := `{"prs":[{"id":"PR-001","title":"Implementation","steps":[{"id":"STEP-001","title":"Build lifecycle"}]}]}`
+	assertSuccess(structured, "plan", "apply")
+
+	runner.branch = "feature/team/execution\n"
+	if output := assertSuccess("", "pr", "start", "PR-001"); output != "Started PR: PR-001 on feature/team/execution\n" {
+		t.Fatalf("pr start stdout = %q", output)
+	}
+	taskPath := filepath.Join(filepath.Dir(planPath), "task.md")
+	wantJSON := fmt.Sprintf("{\n  \"task_id\": \"EXEC-001\",\n  \"pr_id\": \"PR-001\",\n  \"step_id\": \"STEP-001\",\n  \"status\": \"pending\",\n  \"artifacts\": {\n    \"task\": %q,\n    \"plan\": %q\n  }\n}\n", taskPath, planPath)
+	if output := assertSuccess("", "step", "get"); output != wantJSON {
+		t.Fatalf("step get JSON = %q, want %q", output, wantJSON)
+	}
+
+	code, stdout, stderr := run("", "step", "complete")
+	if code != ExitConflict || stdout != "" || !strings.Contains(stderr, "user acceptance requires ready for review") {
+		t.Fatalf("early complete = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+	}
+	for _, command := range [][]string{
+		{"step", "start"},
+		{"step", "submit"},
+		{"step", "revise"},
+		{"step", "submit"},
+		{"step", "complete"},
+	} {
+		assertSuccess("", command...)
+	}
+	if got := strings.TrimSpace(assertSuccess("", "step", "add", "--pr", "PR-001", "--title", "Address final review")); got != "STEP-002" {
+		t.Fatalf("corrective step ID = %q", got)
+	}
+	file, err := os.OpenFile(planPath, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.WriteString("\n#### STEP-002: Address final review\n"); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if output := assertSuccess("", "step", "get"); !strings.Contains(output, `"step_id": "STEP-002"`) || !strings.Contains(output, `"status": "pending"`) {
+		t.Fatalf("corrective step get = %q", output)
+	}
+	for _, command := range [][]string{{"step", "start"}, {"step", "submit"}, {"step", "complete"}} {
+		assertSuccess("", command...)
+	}
+	projected, err := os.ReadFile(planPath)
+	if err != nil || !strings.Contains(string(projected), "STEP-002: Address final review — Completed") {
+		t.Fatalf("final projection = %q, %v", projected, err)
+	}
+
+	code, _, stderr = run("", "step", "reopen")
+	if code != ExitConflict || !strings.Contains(stderr, "multiple Steps") {
+		t.Fatalf("ambiguous reopen = %d, stderr = %q", code, stderr)
+	}
+	assertSuccess("", "step", "reopen", "STEP-002")
+	assertSuccess("", "step", "skip", "--reason", "superseded")
 }

@@ -32,10 +32,17 @@ type WorkflowService interface {
 	ApplyPlan(context.Context, app.ProjectInput, io.Reader) (app.PlanApplyResult, error)
 	AddPR(context.Context, app.ProjectInput, string) (domain.PRID, error)
 	ListPRs(context.Context, app.ProjectInput) ([]app.PRListItem, error)
+	StartPR(context.Context, app.ProjectInput, string) (app.PRListItem, error)
 	SkipPR(context.Context, app.ProjectInput, string, string) (app.PRListItem, error)
 	AddStep(context.Context, app.ProjectInput, string, string) (domain.StepID, error)
 	ListSteps(context.Context, app.ProjectInput) ([]app.StepListItem, error)
+	GetStep(context.Context, app.ProjectInput) (app.StepGetResult, error)
+	StartStep(context.Context, app.ProjectInput, string) (app.StepListItem, error)
+	SubmitStep(context.Context, app.ProjectInput, string) (app.StepListItem, error)
+	ReviseStep(context.Context, app.ProjectInput, string) (app.StepListItem, error)
+	CompleteStep(context.Context, app.ProjectInput, string) (app.StepListItem, error)
 	SkipStep(context.Context, app.ProjectInput, string, string) (app.StepListItem, error)
+	ReopenStep(context.Context, app.ProjectInput, string) (app.StepListItem, error)
 }
 
 // Dependencies contains process-global facilities so command instances remain
