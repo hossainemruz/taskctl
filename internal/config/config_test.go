@@ -129,6 +129,11 @@ func TestStoreStrictDecoding(t *testing.T) {
 			wantIs:   ErrInvalid,
 		},
 		{
+			name:     "viewer command surrounding whitespace",
+			contents: "schema_version: 1\nvault: /tmp/vault\nviewer:\n  command: ' open '\n  args: []\n",
+			wantIs:   ErrInvalid,
+		},
+		{
 			name:     "multiple documents",
 			contents: "schema_version: 1\nvault: /tmp/vault\nviewer:\n  command: typora\n  args: []\n---\nother: document\n",
 			wantIs:   ErrInvalid,

@@ -21,6 +21,7 @@ type projectRunner struct {
 	branch    string
 	branchErr error
 	commands  []processutil.Command
+	startErr  error
 }
 
 func (r *projectRunner) Run(_ context.Context, command processutil.Command) (processutil.Result, error) {
@@ -31,7 +32,10 @@ func (r *projectRunner) Run(_ context.Context, command processutil.Command) (pro
 	return processutil.Result{Stdout: []byte(r.branch)}, r.branchErr
 }
 
-func (*projectRunner) Start(processutil.Command) error { return nil }
+func (r *projectRunner) Start(command processutil.Command) error {
+	r.commands = append(r.commands, command)
+	return r.startErr
+}
 
 func newProjectServiceTest(t *testing.T, runner *projectRunner) (*ProjectService, *vault.Store) {
 	t.Helper()

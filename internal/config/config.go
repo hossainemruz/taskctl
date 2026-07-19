@@ -47,6 +47,9 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.Viewer.Command) == "" {
 		return fmt.Errorf("%w: viewer command is required", ErrInvalid)
 	}
+	if c.Viewer.Command != strings.TrimSpace(c.Viewer.Command) {
+		return fmt.Errorf("%w: viewer command must not have surrounding whitespace", ErrInvalid)
+	}
 	if strings.ContainsRune(c.Viewer.Command, '\x00') {
 		return fmt.Errorf("%w: viewer command contains a NUL byte", ErrInvalid)
 	}

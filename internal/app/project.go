@@ -55,6 +55,7 @@ func (s *ProjectService) RegisterProject(ctx context.Context, input RegisterProj
 	}
 
 	prefixText := strings.TrimSpace(input.TaskPrefix)
+	explicitPrefix := prefixText != ""
 	if prefixText == "" {
 		prefixText = suggestedTaskPrefix(repository.RepositoryName)
 	}
@@ -73,7 +74,7 @@ func (s *ProjectService) RegisterProject(ctx context.Context, input RegisterProj
 				return RegisterProjectResult{}, WrapError(ErrorConflict, ErrRepositoryMismatch,
 					"project ID %s is registered for a different repository", projectID)
 			}
-			if input.TaskPrefix != "" && existing.TaskPrefix != prefix {
+			if explicitPrefix && existing.TaskPrefix != prefix {
 				return RegisterProjectResult{}, NewError(ErrorConflict,
 					"project %s already uses Task prefix %s", projectID, existing.TaskPrefix)
 			}
@@ -198,11 +199,20 @@ func (s *ProjectService) ResolveContext(ctx context.Context, input ResolveContex
 		return ResolvedContext{}, err
 	}
 
-	branch, err := s.git.CurrentBranch(ctx, input.Directory)
-	if errors.Is(err, gitcli.ErrDetachedHEAD) {
-		branch = ""
-	} else if err != nil {
-		return ResolvedContext{}, WrapError(ErrorExternalCommand, err, "resolve current Git branch: %v", err)
+	branch := ""
+	explicitIdentity := strings.TrimSpace(input.ProjectID) != "" && strings.TrimSpace(input.Repository) != ""
+	inspectBranch := input.Directory != "" || !explicitIdentity
+	if inspectBranch {
+		branch, err = s.git.CurrentBranch(ctx, input.Directory)
+		if errors.Is(err, gitcli.ErrDetachedHEAD) {
+			branch = ""
+		} else if err != nil && explicitIdentity {
+			// Explicit identity is sufficient outside a Git worktree. When a
+			// branch is available it still participates in normal precedence.
+			branch = ""
+		} else if err != nil {
+			return ResolvedContext{}, WrapError(ErrorExternalCommand, err, "resolve current Git branch: %v", err)
+		}
 	}
 
 	tasks, err := s.store.ListTasks(project.ID)
