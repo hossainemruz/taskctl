@@ -282,9 +282,9 @@ internal/templates/defaults/review.md.tmpl
   - [x] **Status: Completed** — STEP-006: Implement lifecycle transitions and invariants
   - [x] **Status: Completed** — STEP-007: Implement ID allocation and structured-plan validation
 - PR-003: Implement persistence and Git-backed context facts
-  - [ ] **Status: Pending** — STEP-008: Add atomic YAML stores and project scans
-  - [ ] **Status: Pending** — STEP-009: Add Git process adapter and remote normalization
-  - [ ] **Status: Pending** — STEP-010: Implement project registration and context resolution
+  - [x] **Status: Completed** — STEP-008: Add atomic YAML stores and project scans
+  - [x] **Status: Completed** — STEP-009: Add Git process adapter and remote normalization
+  - [x] **Status: Completed** — STEP-010: Implement project registration and context resolution
 - PR-004: Deliver Task and artifact workflows
   - [ ] **Status: Pending** — STEP-011: Implement new, use, list, and cancel workflows
   - [ ] **Status: Pending** — STEP-012: Implement lazy artifact ensure and path lookup
@@ -491,7 +491,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-008: Add atomic YAML stores and project scans
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Provide the canonical storage implementation.
 - **Related requirements:** R3, R5, R15.
 - **Changes:**
@@ -507,7 +507,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-009: Add Git process adapter and remote normalization
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Hide Git command syntax behind a small, testable interface.
 - **Related requirements:** R2, R7, R16.
 - **Changes:**
@@ -524,7 +524,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-010: Implement project registration and context resolution
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Resolve the same Task correctly across devices and worktrees.
 - **Related requirements:** R2, R3, R7, R15.
 - **Changes:**
