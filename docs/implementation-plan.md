@@ -277,10 +277,10 @@ internal/templates/defaults/review.md.tmpl
   - [x] **Status: Completed** — STEP-002: Implement machine-local configuration
   - [x] **Status: Completed** — STEP-003: Implement vault initialization and embedded templates
 - PR-002: Implement the pure domain model
-  - [ ] **Status: Pending** — STEP-004: Define versioned Task, PR, and Step models
-  - [ ] **Status: Pending** — STEP-005: Implement derived status and progress calculations
-  - [ ] **Status: Pending** — STEP-006: Implement lifecycle transitions and invariants
-  - [ ] **Status: Pending** — STEP-007: Implement ID allocation and structured-plan validation
+  - [x] **Status: Completed** — STEP-004: Define versioned Task, PR, and Step models
+  - [x] **Status: Completed** — STEP-005: Implement derived status and progress calculations
+  - [x] **Status: Completed** — STEP-006: Implement lifecycle transitions and invariants
+  - [x] **Status: Completed** — STEP-007: Implement ID allocation and structured-plan validation
 - PR-003: Implement persistence and Git-backed context facts
   - [ ] **Status: Pending** — STEP-008: Add atomic YAML stores and project scans
   - [ ] **Status: Pending** — STEP-009: Add Git process adapter and remote normalization
@@ -409,7 +409,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-004: Define versioned Task, PR, and Step models
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Freeze a minimal v1 storage contract before implementing stores.
 - **Related requirements:** R5, R6, R15.
 - **Changes:**
@@ -423,7 +423,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-005: Implement derived status and progress calculations
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Make aggregate state impossible to drift from Step state.
 - **Related requirements:** R5, R6, R11, R12.
 - **Changes:**
@@ -437,7 +437,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-006: Implement lifecycle transitions and invariants
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Centralize every state mutation behind validated operations.
 - **Related requirements:** R6, R13, R15.
 - **Changes:**
@@ -452,7 +452,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-007: Implement ID allocation and structured-plan validation
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Make initial and appended IDs deterministic and unambiguous.
 - **Related requirements:** R4, R8, R15.
 - **Changes:**
