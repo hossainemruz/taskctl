@@ -56,6 +56,24 @@ func (panicRunner) Start(process.Command) error {
 	panic("init invoked an external process")
 }
 
+type workflowRunner struct {
+	commands []process.Command
+	started  []process.Command
+}
+
+func (r *workflowRunner) Run(_ context.Context, command process.Command) (process.Result, error) {
+	r.commands = append(r.commands, command)
+	if len(command.Args) > 0 && command.Args[0] == "config" {
+		return process.Result{Stdout: []byte("git@github.com:org/taskctl.git\n")}, nil
+	}
+	return process.Result{Stdout: []byte("main\n")}, nil
+}
+
+func (r *workflowRunner) Start(command process.Command) error {
+	r.started = append(r.started, command)
+	return nil
+}
+
 func TestHelpAndVersion(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
@@ -258,5 +276,72 @@ func TestInitRejectsInvalidExistingLocalConfig(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "vault")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("vault was touched before invalid config was reported: %v", err)
+	}
+}
+
+func TestTaskArtifactCLIWorkflow(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	repository := filepath.Join(root, "repo with spaces")
+	if err := os.Mkdir(repository, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	environment := cliEnvironment{home: filepath.Join(root, "home"), working: repository, xdg: filepath.Join(root, "config")}
+	vaultPath := filepath.Join(root, "vault with spaces")
+	runner := &workflowRunner{}
+	run := func(args ...string) (int, string, string) {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := Execute(context.Background(), Dependencies{Stdout: &stdout, Stderr: &stderr, Environment: environment, Processes: runner}, args)
+		return code, stdout.String(), stderr.String()
+	}
+	assertSuccess := func(args ...string) string {
+		t.Helper()
+		code, stdout, stderr := run(args...)
+		if code != ExitSuccess || stderr != "" {
+			t.Fatalf("taskctl %v = %d, stdout = %q, stderr = %q", args, code, stdout, stderr)
+		}
+		return stdout
+	}
+
+	assertSuccess("init", "--vault", vaultPath, "--viewer", "open", "--viewer-arg=-a", "--viewer-arg=Typora", "--non-interactive")
+	stdout := assertSuccess("new", "First task", "--prefix", "TASKCTL", "--non-interactive")
+	if !strings.Contains(stdout, "Created TASKCTL-001") {
+		t.Fatalf("new stdout = %q", stdout)
+	}
+	researchPath := strings.TrimSpace(assertSuccess("artifact", "ensure", "research"))
+	if !filepath.IsAbs(researchPath) {
+		t.Fatalf("ensure path = %q", researchPath)
+	}
+	const customized = "# Keep me\n"
+	if err := os.WriteFile(researchPath, []byte(customized), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(assertSuccess("artifact", "ensure", "research")); got != researchPath {
+		t.Fatalf("second ensure path = %q, want %q", got, researchPath)
+	}
+	if contents, _ := os.ReadFile(researchPath); string(contents) != customized {
+		t.Fatalf("ensure overwrote customized artifact = %q", contents)
+	}
+	if got := strings.TrimSpace(assertSuccess("path", "research")); got != researchPath {
+		t.Fatalf("path stdout = %q, want %q", got, researchPath)
+	}
+	assertSuccess("new", "Second task", "--non-interactive")
+	if list := assertSuccess("task", "list"); !strings.Contains(list, "TASKCTL-001") || !strings.Contains(list, "* TASKCTL-002") {
+		t.Fatalf("task list = %q", list)
+	}
+	assertSuccess("use", "TASKCTL-001")
+	assertSuccess("task", "cancel")
+	assertSuccess("artifact", "view")
+	if len(runner.started) != 1 {
+		t.Fatalf("viewer starts = %#v", runner.started)
+	}
+	viewer := runner.started[0]
+	wantDirectory := filepath.Dir(researchPath)
+	if viewer.Name != "open" || strings.Join(viewer.Args, "|") != "-a|Typora|"+wantDirectory {
+		t.Fatalf("viewer command = %#v", viewer)
+	}
+	if _, err := os.Stat(filepath.Join(repository, ".agent-task")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("repository-local pointer exists: %v", err)
 	}
 }

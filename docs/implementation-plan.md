@@ -286,10 +286,10 @@ internal/templates/defaults/review.md.tmpl
   - [x] **Status: Completed** — STEP-009: Add Git process adapter and remote normalization
   - [x] **Status: Completed** — STEP-010: Implement project registration and context resolution
 - PR-004: Deliver Task and artifact workflows
-  - [ ] **Status: Pending** — STEP-011: Implement new, use, list, and cancel workflows
-  - [ ] **Status: Pending** — STEP-012: Implement lazy artifact ensure and path lookup
-  - [ ] **Status: Pending** — STEP-013: Implement configured viewer launch
-  - [ ] **Status: Pending** — STEP-014: Add Task/artifact CLI integration coverage
+  - [x] **Status: Completed** — STEP-011: Implement new, use, list, and cancel workflows
+  - [x] **Status: Completed** — STEP-012: Implement lazy artifact ensure and path lookup
+  - [x] **Status: Completed** — STEP-013: Implement configured viewer launch
+  - [x] **Status: Completed** — STEP-014: Add Task/artifact CLI integration coverage
 - PR-005: Deliver structured planning and Markdown projection
   - [ ] **Status: Pending** — STEP-015: Implement plan input and heading validation
   - [ ] **Status: Pending** — STEP-016: Implement bounded Progress rendering
@@ -564,7 +564,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-011: Implement new, use, list, and cancel workflows
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Deliver the core Task catalog and synced selection behavior.
 - **Related requirements:** R2, R3, R4, R5.
 - **Changes:**
@@ -580,7 +580,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-012: Implement lazy artifact ensure and path lookup
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Give agents safe, deterministic artifact creation and discovery.
 - **Related requirements:** R9, R10.
 - **Changes:**
@@ -595,7 +595,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-013: Implement configured viewer launch
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Open a Task directory in Typora or another per-device application.
 - **Related requirements:** R1, R16.
 - **Changes:**
@@ -609,7 +609,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-014: Add Task/artifact CLI integration coverage
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Verify Cobra wiring and persisted effects as one user workflow.
 - **Related requirements:** R1, R3, R4, R10, R15.
 - **Changes:**

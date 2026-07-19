@@ -9,6 +9,7 @@ import (
 
 	"github.com/hossainemruz/taskctl/internal/app"
 	"github.com/hossainemruz/taskctl/internal/config"
+	"github.com/hossainemruz/taskctl/internal/domain"
 	"github.com/hossainemruz/taskctl/internal/process"
 	"github.com/spf13/cobra"
 )
@@ -17,6 +18,17 @@ import (
 type InitService interface {
 	Defaults(context.Context) (app.InitDefaults, error)
 	Init(context.Context, app.InitInput) (app.InitResult, error)
+}
+
+type WorkflowService interface {
+	NewDefaults(context.Context, app.ProjectInput) (app.NewTaskDefaults, error)
+	NewTask(context.Context, app.NewTaskInput) (app.NewTaskResult, error)
+	UseTask(context.Context, app.ProjectInput, string) (domain.Task, error)
+	ListTasks(context.Context, app.ProjectInput) ([]app.TaskListItem, error)
+	CancelTask(context.Context, app.ProjectInput, string) (domain.Task, error)
+	EnsureArtifact(context.Context, app.ProjectInput, string) (app.ArtifactResult, error)
+	ArtifactPath(context.Context, app.ProjectInput, string) (string, error)
+	ViewArtifacts(context.Context, app.ProjectInput) (string, error)
 }
 
 // Dependencies contains process-global facilities so command instances remain
@@ -28,6 +40,7 @@ type Dependencies struct {
 	Environment config.Environment
 	Processes   process.Runner
 	Initializer InitService
+	Workflow    WorkflowService
 	Version     string
 }
 
@@ -48,6 +61,10 @@ func NewRootCommand(dependencies Dependencies) *cobra.Command {
 	initializer := dependencies.Initializer
 	if initializer == nil {
 		initializer = app.NewInitializer(dependencies.Environment)
+	}
+	workflow := dependencies.Workflow
+	if workflow == nil {
+		workflow = app.NewWorkflow(dependencies.Environment, dependencies.Processes)
 	}
 
 	root := &cobra.Command{
@@ -74,6 +91,11 @@ func NewRootCommand(dependencies Dependencies) *cobra.Command {
 	})
 
 	root.AddCommand(newInitCommand(initializer))
+	root.AddCommand(newNewCommand(workflow, dependencies.Environment))
+	root.AddCommand(newUseCommand(workflow, dependencies.Environment))
+	root.AddCommand(newTaskCommand(workflow, dependencies.Environment))
+	root.AddCommand(newPathCommand(workflow, dependencies.Environment))
+	root.AddCommand(newArtifactCommand(workflow, dependencies.Environment))
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the taskctl version",
