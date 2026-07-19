@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -60,8 +61,34 @@ func newPRCommand(workflow WorkflowService, environment config.Environment) *cob
 	command.AddCommand(
 		newPRAddCommand(workflow, environment),
 		newPRListCommand(workflow, environment),
+		newPRStartCommand(workflow, environment),
 		newPRSkipCommand(workflow, environment),
 	)
+	return command
+}
+
+func newPRStartCommand(workflow WorkflowService, environment config.Environment) *cobra.Command {
+	var flags projectFlags
+	command := &cobra.Command{
+		Use:   "start <pr-id>",
+		Short: "Associate a pending PR with the current branch",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(command *cobra.Command, args []string) error {
+			project, err := flags.input(environment)
+			if err != nil {
+				return err
+			}
+			item, err := workflow.StartPR(command.Context(), project, args[0])
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(command.OutOrStdout(), "Started PR: %s on %s\n", item.ID, item.Branch); err != nil {
+				return app.WrapError(app.ErrorInternal, err, "write PR start result: %v", err)
+			}
+			return nil
+		},
+	}
+	flags.bind(command)
 	return command
 }
 
@@ -171,9 +198,72 @@ func newStepCommand(workflow WorkflowService, environment config.Environment) *c
 	command := &cobra.Command{Use: "step", Short: "Manage Task Steps", Args: cobra.NoArgs}
 	command.AddCommand(
 		newStepAddCommand(workflow, environment),
+		newStepGetCommand(workflow, environment),
 		newStepListCommand(workflow, environment),
+		newStepLifecycleCommand(environment, "start", "Start implementation of a Step", "Started", workflow.StartStep),
+		newStepLifecycleCommand(environment, "submit", "Submit a Step for user review", "Submitted", workflow.SubmitStep),
+		newStepLifecycleCommand(environment, "revise", "Return a Step to implementation", "Revised", workflow.ReviseStep),
+		newStepLifecycleCommand(environment, "complete", "Record user acceptance of a Step", "Completed", workflow.CompleteStep),
 		newStepSkipCommand(workflow, environment),
+		newStepLifecycleCommand(environment, "reopen", "Reopen a completed or skipped Step", "Reopened", workflow.ReopenStep),
 	)
+	return command
+}
+
+func newStepGetCommand(workflow WorkflowService, environment config.Environment) *cobra.Command {
+	var flags projectFlags
+	command := &cobra.Command{
+		Use:   "get",
+		Short: "Get the selected Step for the current PR as JSON",
+		Args:  cobra.NoArgs,
+		RunE: func(command *cobra.Command, _ []string) error {
+			project, err := flags.input(environment)
+			if err != nil {
+				return err
+			}
+			result, err := workflow.GetStep(command.Context(), project)
+			if err != nil {
+				return err
+			}
+			return writeJSON(command.OutOrStdout(), result, "Step")
+		},
+	}
+	flags.bind(command)
+	return command
+}
+
+type stepLifecycleFunc func(context.Context, app.ProjectInput, string) (app.StepListItem, error)
+
+func newStepLifecycleCommand(
+	environment config.Environment,
+	name, short, outputVerb string,
+	run stepLifecycleFunc,
+) *cobra.Command {
+	var flags projectFlags
+	command := &cobra.Command{
+		Use:   name + " [step-id]",
+		Short: short,
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(command *cobra.Command, args []string) error {
+			project, err := flags.input(environment)
+			if err != nil {
+				return err
+			}
+			stepID := ""
+			if len(args) == 1 {
+				stepID = args[0]
+			}
+			item, err := run(command.Context(), project, stepID)
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(command.OutOrStdout(), "%s Step: %s\n", outputVerb, item.ID); err != nil {
+				return app.WrapError(app.ErrorInternal, err, "write Step %s result: %v", name, err)
+			}
+			return nil
+		},
+	}
+	flags.bind(command)
 	return command
 }
 
@@ -255,9 +345,9 @@ func newStepSkipCommand(workflow WorkflowService, environment config.Environment
 	var flags projectFlags
 	var reason string
 	command := &cobra.Command{
-		Use:   "skip <step-id>",
+		Use:   "skip [step-id]",
 		Short: "Remove a Step from scope with a reason",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
 			if strings.TrimSpace(reason) == "" {
 				return app.NewError(app.ErrorUsage, "--reason is required")
@@ -266,7 +356,11 @@ func newStepSkipCommand(workflow WorkflowService, environment config.Environment
 			if err != nil {
 				return err
 			}
-			item, err := workflow.SkipStep(command.Context(), project, args[0], reason)
+			stepID := ""
+			if len(args) == 1 {
+				stepID = args[0]
+			}
+			item, err := workflow.SkipStep(command.Context(), project, stepID, reason)
 			if err != nil {
 				return err
 			}

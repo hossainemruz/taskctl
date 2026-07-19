@@ -296,10 +296,10 @@ internal/templates/defaults/review.md.tmpl
   - [x] **Status: Completed** — STEP-017: Implement plan apply and safe metadata correction
   - [x] **Status: Completed** — STEP-018: Implement append-only PR/Step evolution and list commands
 - PR-006: Deliver PR and Step execution lifecycle
-  - [ ] **Status: Pending** — STEP-019: Implement PR start and branch association
-  - [ ] **Status: Pending** — STEP-020: Implement Step selection and `step get` JSON
-  - [ ] **Status: Pending** — STEP-021: Implement Step lifecycle commands
-  - [ ] **Status: Pending** — STEP-022: Verify incremental review and reopening workflows
+  - [x] **Status: Completed** — STEP-019: Implement PR start and branch association
+  - [x] **Status: Completed** — STEP-020: Implement Step selection and `step get` JSON
+  - [x] **Status: Completed** — STEP-021: Implement Step lifecycle commands
+  - [x] **Status: Completed** — STEP-022: Verify incremental review and reopening workflows
 - PR-007: Deliver context, human status, and vault Git status
   - [ ] **Status: Pending** — STEP-023: Implement the `context` JSON contract
   - [ ] **Status: Pending** — STEP-024: Implement detailed human Task status
@@ -733,7 +733,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-019: Implement PR start and branch association
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Bind a planned PR to the user's already-created current branch.
 - **Related requirements:** R3, R6, R7.
 - **Changes:**
@@ -749,7 +749,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-020: Implement Step selection and `step get` JSON
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Give implementation agents the smallest safe state-discovery
   response.
 - **Related requirements:** R6, R11.
@@ -765,7 +765,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-021: Implement Step lifecycle commands
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Record implementation, automated review, user feedback, and
   acceptance through explicit transitions.
 - **Related requirements:** R6, R9, R13, R15.
@@ -781,7 +781,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-022: Verify incremental review and reopening workflows
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Prove aggregate behavior across the workflow's highest-risk state
   sequences.
 - **Related requirements:** R5, R6, R13.

@@ -230,7 +230,7 @@ func TestWorkflowExplicitIdentityWorksOutsideGit(t *testing.T) {
 
 func TestWorkflowStructuredPlanningEvolutionAndProjection(t *testing.T) {
 	t.Parallel()
-	workflow, _, store, projectInput := newWorkflowTest(t)
+	workflow, runner, store, projectInput := newWorkflowTest(t)
 	created, err := workflow.NewTask(t.Context(), NewTaskInput{ProjectInput: projectInput, Title: "Planning", TaskPrefix: "PLAN"})
 	if err != nil {
 		t.Fatal(err)
@@ -328,6 +328,7 @@ func TestWorkflowStructuredPlanningEvolutionAndProjection(t *testing.T) {
 	if err != nil || len(prs) != 3 || prs[2].ID != "PR-003" {
 		t.Fatalf("ListPRs() = %#v, %v", prs, err)
 	}
+	runner.branch = "feat/storage\n"
 	if item, err := workflow.SkipStep(t.Context(), projectInput, string(stepID), "not needed"); err != nil || item.Status != domain.StepSkipped {
 		t.Fatalf("SkipStep() = %#v, %v", item, err)
 	}
