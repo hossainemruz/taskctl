@@ -58,26 +58,62 @@ func (panicRunner) Start(process.Command) error {
 }
 
 type workflowRunner struct {
-	commands []process.Command
-	started  []process.Command
-	branch   string
+	commands      []process.Command
+	started       []process.Command
+	branch        string
+	vaultDirty    string
+	vaultCounts   string
+	fetchErr      error
+	noUpstream    bool
+	notRepository bool
 }
 
 func (r *workflowRunner) Run(_ context.Context, command process.Command) (process.Result, error) {
 	r.commands = append(r.commands, command)
-	if len(command.Args) > 0 && command.Args[0] == "config" {
+	if len(command.Args) == 0 {
+		return process.Result{}, nil
+	}
+	switch command.Args[0] {
+	case "config":
 		return process.Result{Stdout: []byte("git@github.com:org/taskctl.git\n")}, nil
+	case "symbolic-ref":
+		branch := r.branch
+		if branch == "" {
+			branch = "main\n"
+		}
+		return process.Result{Stdout: []byte(branch)}, nil
+	case "fetch":
+		return process.Result{}, r.fetchErr
+	case "status":
+		return process.Result{Stdout: []byte(r.vaultDirty)}, nil
+	case "rev-list":
+		counts := r.vaultCounts
+		if counts == "" {
+			counts = "0\t0\n"
+		}
+		return process.Result{Stdout: []byte(counts)}, nil
+	case "rev-parse":
+		if len(command.Args) > 1 && command.Args[1] == "--is-inside-work-tree" {
+			if r.notRepository {
+				return process.Result{}, testGitExit(128)
+			}
+			return process.Result{Stdout: []byte("true\n")}, nil
+		}
+		if r.noUpstream {
+			return process.Result{}, testGitExit(1)
+		}
+		return process.Result{Stdout: []byte("abc123\n")}, nil
 	}
-	branch := r.branch
-	if branch == "" {
-		branch = "main\n"
-	}
-	return process.Result{Stdout: []byte(branch)}, nil
+	return process.Result{}, nil
 }
 
 func (r *workflowRunner) Start(command process.Command) error {
 	r.started = append(r.started, command)
 	return nil
+}
+
+func testGitExit(code int) error {
+	return &process.CommandError{Name: "git", ExitCode: code, Cause: fmt.Errorf("exit status %d", code)}
 }
 
 func TestHelpAndVersion(t *testing.T) {
@@ -520,4 +556,107 @@ func TestExecutionCLIWorkflowAndStepGetJSON(t *testing.T) {
 	}
 	assertSuccess("", "step", "reopen", "STEP-002")
 	assertSuccess("", "step", "skip", "--reason", "superseded")
+}
+
+func TestContextTaskStatusAndVaultStatusCLI(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	repository := filepath.Join(root, "repo")
+	if err := os.Mkdir(repository, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	environment := cliEnvironment{home: filepath.Join(root, "home"), working: repository, xdg: filepath.Join(root, "config")}
+	vaultPath := filepath.Join(root, "vault")
+	runner := &workflowRunner{}
+	run := func(stdin string, args ...string) (int, string, string) {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := Execute(context.Background(), Dependencies{Stdin: strings.NewReader(stdin), Stdout: &stdout, Stderr: &stderr,
+			Environment: environment, Processes: runner}, args)
+		return code, stdout.String(), stderr.String()
+	}
+	assertSuccess := func(stdin string, args ...string) string {
+		t.Helper()
+		code, stdout, stderr := run(stdin, args...)
+		if code != ExitSuccess || stderr != "" {
+			t.Fatalf("taskctl %v = %d, stdout = %q, stderr = %q", args, code, stdout, stderr)
+		}
+		return stdout
+	}
+
+	assertSuccess("", "init", "--vault", vaultPath, "--viewer", "typora", "--non-interactive")
+	assertSuccess("", "new", "Status task", "--prefix", "STAT", "--non-interactive")
+	researchPath := strings.TrimSpace(assertSuccess("", "artifact", "ensure", "research"))
+	planPath := strings.TrimSpace(assertSuccess("", "artifact", "ensure", "plan"))
+	contents, err := os.ReadFile(planPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents = []byte(strings.Replace(string(contents), "Use `### PR-NNN: Title`",
+		"### PR-001: Delivery\n\n#### STEP-001: Implement\n\nUse `### PR-NNN: Title`", 1))
+	if err := os.WriteFile(planPath, contents, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	structured := `{"prs":[{"id":"PR-001","title":"Delivery","steps":[{"id":"STEP-001","title":"Implement"}]}]}`
+	assertSuccess(structured, "plan", "apply")
+	runner.branch = "feature/status\n"
+	assertSuccess("", "pr", "start", "PR-001")
+	assertSuccess("", "step", "start")
+	assertSuccess("", "step", "submit")
+
+	if got := countGitCommand(runner.commands, "fetch"); got != 0 {
+		t.Fatalf("commands before status fetched %d times", got)
+	}
+	taskPath := filepath.Join(filepath.Dir(planPath), "task.md")
+	wantContext := fmt.Sprintf("{\n  \"project_id\": \"org_taskctl\",\n  \"task_id\": \"STAT-001\",\n  \"status\": \"in_progress\",\n  \"progress\": {\n    \"completed\": 0,\n    \"skipped\": 0,\n    \"total\": 1\n  },\n  \"current_pr\": {\n    \"id\": \"PR-001\",\n    \"status\": \"in_progress\",\n    \"progress\": {\n      \"completed\": 0,\n      \"skipped\": 0,\n      \"total\": 1\n    },\n    \"active_step\": {\n      \"id\": \"STEP-001\",\n      \"status\": \"ready_for_review\"\n    }\n  },\n  \"artifacts\": {\n    \"task\": %q,\n    \"research\": %q,\n    \"plan\": %q\n  }\n}\n", taskPath, researchPath, planPath)
+	if output := assertSuccess("", "context"); output != wantContext {
+		t.Fatalf("context JSON = %q, want %q", output, wantContext)
+	}
+	if got := countGitCommand(runner.commands, "fetch"); got != 0 {
+		t.Fatalf("context fetched vault %d times", got)
+	}
+
+	runner.branch = "main\n"
+	if fallback := assertSuccess("", "context"); strings.Contains(fallback, `"current_pr"`) || !strings.Contains(fallback, `"task_id": "STAT-001"`) {
+		t.Fatalf("fallback context = %q", fallback)
+	}
+	runner.branch = "feature/status\n"
+	wantStatus := fmt.Sprintf("Task: STAT-001 — Status task\nProject: org_taskctl\nStatus: In Progress\nProgress: 0/1 done (0 completed, 0 skipped)\nCurrent PR: PR-001\nActive Step: STEP-001\n\nPRs:\n* PR-001: Delivery — In Progress\n  Progress: 0/1 done (0 completed, 0 skipped)\n  Branch: feature/status\n  > STEP-001: Implement — Ready for Review\n\nArtifacts:\n  task: %s\n  research: %s\n  plan: %s\n\nVault: clean · ahead 0 · behind 0\n", taskPath, researchPath, planPath)
+	if output := assertSuccess("", "status"); output != wantStatus {
+		t.Fatalf("status output = %q, want %q", output, wantStatus)
+	}
+	if got := countGitCommand(runner.commands, "fetch"); got != 1 {
+		t.Fatalf("status fetch count = %d", got)
+	}
+	if output := assertSuccess("", "vault", "status"); output != "Vault: clean · ahead 0 · behind 0\n" {
+		t.Fatalf("vault status = %q", output)
+	}
+	if got := countGitCommand(runner.commands, "fetch"); got != 2 {
+		t.Fatalf("vault status fetch count = %d", got)
+	}
+
+	runner.fetchErr = testGitExit(128)
+	runner.vaultDirty = " M projects/task.yaml\n?? local.md\n"
+	if output := assertSuccess("", "status"); !strings.HasSuffix(output, "Vault: 2 uncommitted files · remote status unavailable\n") {
+		t.Fatalf("status with fetch warning = %q", output)
+	}
+	runner.noUpstream = true
+	if output := assertSuccess("", "vault", "status"); output != "Vault: 2 uncommitted files · no upstream\n" {
+		t.Fatalf("no-upstream vault status = %q", output)
+	}
+	runner.noUpstream = false
+	runner.notRepository = true
+	if output := assertSuccess("", "vault", "status"); output != "Vault: not a Git repository\n" {
+		t.Fatalf("non-repository vault status = %q", output)
+	}
+}
+
+func countGitCommand(commands []process.Command, name string) int {
+	count := 0
+	for _, command := range commands {
+		if len(command.Args) > 0 && command.Args[0] == name {
+			count++
+		}
+	}
+	return count
 }
