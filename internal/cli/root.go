@@ -43,6 +43,9 @@ type WorkflowService interface {
 	CompleteStep(context.Context, app.ProjectInput, string) (app.StepListItem, error)
 	SkipStep(context.Context, app.ProjectInput, string, string) (app.StepListItem, error)
 	ReopenStep(context.Context, app.ProjectInput, string) (app.StepListItem, error)
+	Context(context.Context, app.ProjectInput) (app.ContextResult, error)
+	Status(context.Context, app.ProjectInput) (app.StatusResult, error)
+	VaultStatus(context.Context) (app.VaultStatusResult, error)
 }
 
 // Dependencies contains process-global facilities so command instances remain
@@ -113,6 +116,9 @@ func NewRootCommand(dependencies Dependencies) *cobra.Command {
 	root.AddCommand(newPlanCommand(workflow, dependencies.Environment))
 	root.AddCommand(newPRCommand(workflow, dependencies.Environment))
 	root.AddCommand(newStepCommand(workflow, dependencies.Environment))
+	root.AddCommand(newContextCommand(workflow, dependencies.Environment))
+	root.AddCommand(newStatusCommand(workflow, dependencies.Environment))
+	root.AddCommand(newVaultCommand(workflow))
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the taskctl version",

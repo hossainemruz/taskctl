@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	processutil "github.com/hossainemruz/taskctl/internal/process"
 )
@@ -13,12 +14,13 @@ const defaultExecutable = "git"
 
 // Client hides Git command syntax behind repository-oriented operations.
 type Client struct {
-	runner     processutil.Runner
-	executable string
+	runner       processutil.Runner
+	executable   string
+	fetchTimeout time.Duration
 }
 
 func NewClient(runner processutil.Runner) *Client {
-	return &Client{runner: runner, executable: defaultExecutable}
+	return &Client{runner: runner, executable: defaultExecutable, fetchTimeout: vaultFetchTimeout}
 }
 
 // Origin returns remote.origin.url exactly as configured apart from surrounding
@@ -63,6 +65,10 @@ func (c *Client) CurrentBranch(ctx context.Context, directory string) (string, e
 }
 
 func (c *Client) run(ctx context.Context, directory string, arguments ...string) (processutil.Result, error) {
+	return c.runWithEnv(ctx, directory, nil, arguments...)
+}
+
+func (c *Client) runWithEnv(ctx context.Context, directory string, environment []string, arguments ...string) (processutil.Result, error) {
 	if c == nil || c.runner == nil {
 		return processutil.Result{}, fmt.Errorf("%w: process runner is not configured", ErrCommand)
 	}
@@ -74,6 +80,7 @@ func (c *Client) run(ctx context.Context, directory string, arguments ...string)
 		Name: executable,
 		Args: append([]string(nil), arguments...),
 		Dir:  directory,
+		Env:  environment,
 	})
 }
 

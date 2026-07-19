@@ -301,10 +301,10 @@ internal/templates/defaults/review.md.tmpl
   - [x] **Status: Completed** — STEP-021: Implement Step lifecycle commands
   - [x] **Status: Completed** — STEP-022: Verify incremental review and reopening workflows
 - PR-007: Deliver context, human status, and vault Git status
-  - [ ] **Status: Pending** — STEP-023: Implement the `context` JSON contract
-  - [ ] **Status: Pending** — STEP-024: Implement detailed human Task status
-  - [ ] **Status: Pending** — STEP-025: Implement fresh vault Git status
-  - [ ] **Status: Pending** — STEP-026: Verify branch precedence and cross-device fallback
+  - [x] **Status: Completed** — STEP-023: Implement the `context` JSON contract
+  - [x] **Status: Completed** — STEP-024: Implement detailed human Task status
+  - [x] **Status: Completed** — STEP-025: Implement fresh vault Git status
+  - [x] **Status: Completed** — STEP-026: Verify branch precedence and cross-device fallback
 - PR-008: Harden and document the MVP
   - [ ] **Status: Pending** — STEP-027: Add corruption, ambiguity, and failure-path coverage
   - [ ] **Status: Pending** — STEP-028: Add full CLI workflow tests
@@ -819,7 +819,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-023: Implement the `context` JSON contract
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Provide stable current Task/PR/Step progress and artifact discovery.
 - **Related requirements:** R3, R5, R11, R15.
 - **Changes:**
@@ -834,7 +834,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-024: Implement detailed human Task status
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Replace artifact scanning with a concise human dashboard.
 - **Related requirements:** R5, R12.
 - **Changes:**
@@ -849,7 +849,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-025: Implement fresh vault Git status
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Surface synchronization risk while leaving synchronization to the
   user.
 - **Related requirements:** R14, R16.
@@ -866,7 +866,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-026: Verify branch precedence and cross-device fallback
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Validate the key replacement for `.agent-task` under realistic
   multi-Task use.
 - **Related requirements:** R2, R3, R7, R11, R12.
