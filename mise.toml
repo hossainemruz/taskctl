@@ -12,6 +12,14 @@ run = [
 description = "Format Go source files"
 run = "go fmt ./..."
 
+[tasks.test]
+description = "Run all tests"
+run = "go test ./..."
+
+[tasks.ci]
+description = "Run build, format, lint, and test checks"
+depends = ["build", "format", "lint", "test"]
+
 [tasks.lint]
 description = "Run Go static analysis"
 run = "go vet ./..."

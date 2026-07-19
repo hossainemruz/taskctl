@@ -1,10 +1,8 @@
 package vault
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -132,17 +130,8 @@ func validateManifest(path string) error {
 		return fmt.Errorf("read vault manifest: %w", err)
 	}
 	var manifest Manifest
-	decoder := yaml.NewDecoder(bytes.NewReader(contents))
-	decoder.KnownFields(true)
-	if err := decoder.Decode(&manifest); err != nil {
-		return fmt.Errorf("%w: decode %s: %v", ErrInvalid, ManifestName, err)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			return fmt.Errorf("%w: %s contains multiple YAML documents", ErrInvalid, ManifestName)
-		}
-		return fmt.Errorf("%w: decode %s: %v", ErrInvalid, ManifestName, err)
+	if err := decodeYAML(contents, &manifest, ManifestName); err != nil {
+		return err
 	}
 	if manifest.SchemaVersion != SchemaVersion {
 		return fmt.Errorf("%w: got %d, want %d", ErrUnsupportedVersion, manifest.SchemaVersion, SchemaVersion)
