@@ -273,9 +273,9 @@ internal/templates/defaults/review.md.tmpl
 ## Progress
 
 - PR-001: Establish CLI and vault bootstrap
-  - [ ] **Status: Pending** — STEP-001: Add CLI entry point and error/output contract
-  - [ ] **Status: Pending** — STEP-002: Implement machine-local configuration
-  - [ ] **Status: Pending** — STEP-003: Implement vault initialization and embedded templates
+  - [x] **Status: Completed** — STEP-001: Add CLI entry point and error/output contract
+  - [x] **Status: Completed** — STEP-002: Implement machine-local configuration
+  - [x] **Status: Completed** — STEP-003: Implement vault initialization and embedded templates
 - PR-002: Implement the pure domain model
   - [ ] **Status: Pending** — STEP-004: Define versioned Task, PR, and Step models
   - [ ] **Status: Pending** — STEP-005: Implement derived status and progress calculations
@@ -340,7 +340,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-001: Add CLI entry point and error/output contract
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Establish the outer interface before adding domain behavior.
 - **Related requirements:** R15, R16.
 - **Changes:**
@@ -357,7 +357,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-002: Implement machine-local configuration
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Persist per-device vault and viewer settings portably.
 - **Related requirements:** R1, R16.
 - **Changes:**
@@ -371,7 +371,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-003: Implement vault initialization and embedded templates
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Replace Obsidian-based bootstrap with a safe CLI workflow.
 - **Related requirements:** R1, R9, R10.
 - **Changes:**
