@@ -29,6 +29,13 @@ type WorkflowService interface {
 	EnsureArtifact(context.Context, app.ProjectInput, string) (app.ArtifactResult, error)
 	ArtifactPath(context.Context, app.ProjectInput, string) (string, error)
 	ViewArtifacts(context.Context, app.ProjectInput) (string, error)
+	ApplyPlan(context.Context, app.ProjectInput, io.Reader) (app.PlanApplyResult, error)
+	AddPR(context.Context, app.ProjectInput, string) (domain.PRID, error)
+	ListPRs(context.Context, app.ProjectInput) ([]app.PRListItem, error)
+	SkipPR(context.Context, app.ProjectInput, string, string) (app.PRListItem, error)
+	AddStep(context.Context, app.ProjectInput, string, string) (domain.StepID, error)
+	ListSteps(context.Context, app.ProjectInput) ([]app.StepListItem, error)
+	SkipStep(context.Context, app.ProjectInput, string, string) (app.StepListItem, error)
 }
 
 // Dependencies contains process-global facilities so command instances remain
@@ -96,6 +103,9 @@ func NewRootCommand(dependencies Dependencies) *cobra.Command {
 	root.AddCommand(newTaskCommand(workflow, dependencies.Environment))
 	root.AddCommand(newPathCommand(workflow, dependencies.Environment))
 	root.AddCommand(newArtifactCommand(workflow, dependencies.Environment))
+	root.AddCommand(newPlanCommand(workflow, dependencies.Environment))
+	root.AddCommand(newPRCommand(workflow, dependencies.Environment))
+	root.AddCommand(newStepCommand(workflow, dependencies.Environment))
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the taskctl version",

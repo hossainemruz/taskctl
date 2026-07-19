@@ -161,3 +161,37 @@ func (s *Store) ArtifactPath(projectID string, taskID domain.TaskID, artifact Ar
 	}
 	return path, nil
 }
+
+// ReadArtifact reads an existing regular artifact after validating its Task
+// path. Artifact prose is never inferred from or persisted into manifests.
+func (s *Store) ReadArtifact(projectID string, taskID domain.TaskID, artifact Artifact) ([]byte, error) {
+	path, err := s.ArtifactPath(projectID, taskID, artifact)
+	if err != nil {
+		return nil, err
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read artifact %s: %w", artifact, err)
+	}
+	return contents, nil
+}
+
+// WriteArtifact atomically replaces an existing regular artifact while
+// preserving its permission bits. It never creates a missing lazy artifact.
+func (s *Store) WriteArtifact(projectID string, taskID domain.TaskID, artifact Artifact, contents []byte) error {
+	path, err := s.ArtifactPath(projectID, taskID, artifact)
+	if err != nil {
+		return err
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return fmt.Errorf("inspect artifact %s: %w", artifact, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return fmt.Errorf("%w: artifact %s is not a regular file", ErrCorrupt, artifact)
+	}
+	if err := fsutil.AtomicWriteFile(path, contents, info.Mode().Perm()); err != nil {
+		return fmt.Errorf("write %s.md: %w", artifact, err)
+	}
+	return nil
+}

@@ -228,6 +228,176 @@ func TestWorkflowExplicitIdentityWorksOutsideGit(t *testing.T) {
 	}
 }
 
+func TestWorkflowStructuredPlanningEvolutionAndProjection(t *testing.T) {
+	t.Parallel()
+	workflow, _, store, projectInput := newWorkflowTest(t)
+	created, err := workflow.NewTask(t.Context(), NewTaskInput{ProjectInput: projectInput, Title: "Planning", TaskPrefix: "PLAN"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := workflow.EnsureArtifact(t.Context(), projectInput, "plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writePlan := func(headings string) {
+		t.Helper()
+		contents := "# Plan\n\n## Progress\n\n<!-- taskctl:progress:start -->\n\nold\n\n<!-- taskctl:progress:end -->\n\n## Plan\n\n" + headings
+		if err := os.WriteFile(artifact.Path, []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	writePlan("### PR-001: Storage\n\n#### STEP-001: Schema\n")
+	initialJSON := `{"prs":[{"id":"PR-001","title":"Storage","steps":[{"id":"STEP-001","title":"Schema"}]}]}`
+	result, err := workflow.ApplyPlan(t.Context(), projectInput, strings.NewReader(initialJSON))
+	if err != nil || result.PRCount != 1 || result.StepCount != 1 {
+		t.Fatalf("ApplyPlan(initial) = %#v, %v", result, err)
+	}
+	projection, _ := os.ReadFile(artifact.Path)
+	if !strings.Contains(string(projection), "- PR-001: Storage — Pending") || !strings.Contains(string(projection), "STEP-001: Schema — Pending") {
+		t.Fatalf("initial projection = %q", projection)
+	}
+
+	writePlan("### PR-001: Storage\n\n#### STEP-001: Schema\n\n### PR-002: CLI\n\n#### STEP-002: Commands\n")
+	replacementJSON := `{"prs":[{"id":"PR-001","title":"Storage","steps":[{"id":"STEP-001","title":"Schema"}]},{"id":"PR-002","title":"CLI","steps":[{"id":"STEP-002","title":"Commands"}]}]}`
+	if _, err := workflow.ApplyPlan(t.Context(), projectInput, strings.NewReader(replacementJSON)); err != nil {
+		t.Fatalf("ApplyPlan(draft replacement) error = %v", err)
+	}
+	task, err := store.LoadTask("org_repo", created.Task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := task.StartPR("PR-001", "feat/storage", task.CreatedAt); err != nil {
+		t.Fatal(err)
+	}
+	startedAt := *task.PRs[0].StartedAt
+	if err := store.SaveTask(task); err != nil {
+		t.Fatal(err)
+	}
+
+	writePlan("### PR-001: Revised storage\n\n#### STEP-001: Revised schema\n\n### PR-002: CLI\n\n#### STEP-002: Commands\n")
+	correctedJSON := `{"prs":[{"id":"PR-001","title":"Revised storage","steps":[{"id":"STEP-001","title":"Revised schema"}]},{"id":"PR-002","title":"CLI","steps":[{"id":"STEP-002","title":"Commands"}]}]}`
+	if _, err := workflow.ApplyPlan(t.Context(), projectInput, strings.NewReader(correctedJSON)); err != nil {
+		t.Fatalf("ApplyPlan(title correction) error = %v", err)
+	}
+	task, err = store.LoadTask("org_repo", created.Task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.PRs[0].Title != "Revised storage" || task.PRs[0].Branch != "feat/storage" || !task.PRs[0].StartedAt.Equal(startedAt) {
+		t.Fatalf("corrected task = %#v", task)
+	}
+	if _, err := workflow.ApplyPlan(t.Context(), projectInput, strings.NewReader(initialJSON)); !hasErrorKind(err, ErrorConflict) {
+		t.Fatalf("post-start topology replacement error = %v", err)
+	}
+
+	broken := strings.Replace(string(mustReadFile(t, artifact.Path)), "<!-- taskctl:progress:end -->", "", 1)
+	if err := os.WriteFile(artifact.Path, []byte(broken), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before, err := store.LoadTask("org_repo", created.Task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workflow.AddStep(t.Context(), projectInput, "PR-001", "Must not persist"); !hasErrorKind(err, ErrorInvalidData) {
+		t.Fatalf("AddStep() marker error = %v", err)
+	}
+	after, err := store.LoadTask("org_repo", created.Task.ID)
+	if err != nil || len(after.PRs[0].Steps) != len(before.PRs[0].Steps) {
+		t.Fatalf("failed projection preparation changed Task: %#v, %v", after, err)
+	}
+
+	writePlan("### PR-001: Revised storage\n\n#### STEP-001: Revised schema\n\n### PR-002: CLI\n\n#### STEP-002: Commands\n")
+	stepID, err := workflow.AddStep(t.Context(), projectInput, "PR-001", "Address review")
+	if err != nil || stepID != "STEP-003" {
+		t.Fatalf("AddStep() = %s, %v", stepID, err)
+	}
+	prID, err := workflow.AddPR(t.Context(), projectInput, "Documentation")
+	if err != nil || prID != "PR-003" {
+		t.Fatalf("AddPR() = %s, %v", prID, err)
+	}
+	lastStep, err := workflow.AddStep(t.Context(), projectInput, string(prID), "Write docs")
+	if err != nil || lastStep != "STEP-004" {
+		t.Fatalf("AddStep(new PR) = %s, %v", lastStep, err)
+	}
+	steps, err := workflow.ListSteps(t.Context(), projectInput)
+	if err != nil || len(steps) != 4 || steps[1].ID != "STEP-003" || steps[2].ID != "STEP-002" {
+		t.Fatalf("ListSteps() = %#v, %v", steps, err)
+	}
+	prs, err := workflow.ListPRs(t.Context(), projectInput)
+	if err != nil || len(prs) != 3 || prs[2].ID != "PR-003" {
+		t.Fatalf("ListPRs() = %#v, %v", prs, err)
+	}
+	if item, err := workflow.SkipStep(t.Context(), projectInput, string(stepID), "not needed"); err != nil || item.Status != domain.StepSkipped {
+		t.Fatalf("SkipStep() = %#v, %v", item, err)
+	}
+	if item, err := workflow.SkipPR(t.Context(), projectInput, string(prID), "deferred"); err != nil || item.Status != domain.PRSkipped {
+		t.Fatalf("SkipPR() = %#v, %v", item, err)
+	}
+	projection = mustReadFile(t, artifact.Path)
+	if !strings.Contains(string(projection), "STEP-003: Address review — Skipped") || !strings.Contains(string(projection), "PR-003: Documentation — Skipped") {
+		t.Fatalf("evolved projection = %q", projection)
+	}
+}
+
+func TestWorkflowApplyPlanRejectsInputAndHeadingMismatches(t *testing.T) {
+	t.Parallel()
+	workflow, _, _, projectInput := newWorkflowTest(t)
+	if _, err := workflow.NewTask(t.Context(), NewTaskInput{ProjectInput: projectInput, Title: "Planning", TaskPrefix: "PLAN"}); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := workflow.EnsureArtifact(t.Context(), projectInput, "plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workflow.ApplyPlan(t.Context(), projectInput, strings.NewReader(`{"prs":[],"unknown":true}`)); !hasErrorKind(err, ErrorUsage) {
+		t.Fatalf("unknown JSON field error = %v", err)
+	}
+	contents := strings.Replace(string(mustReadFile(t, artifact.Path)), "Use `### PR-NNN: Title`", "### PR-001: Wrong\n\n#### STEP-001: Schema\n\nUse `### PR-NNN: Title`", 1)
+	if err := os.WriteFile(artifact.Path, []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	input := `{"prs":[{"id":"PR-001","title":"Storage","steps":[{"id":"STEP-001","title":"Schema"}]}]}`
+	if _, err := workflow.ApplyPlan(t.Context(), projectInput, strings.NewReader(input)); !hasErrorKind(err, ErrorInvalidData) {
+		t.Fatalf("heading mismatch error = %v", err)
+	}
+}
+
+func TestSaveTaskAndProjectionReportsCanonicalPartialUpdate(t *testing.T) {
+	t.Parallel()
+	workflow, _, store, projectInput := newWorkflowTest(t)
+	created, err := workflow.NewTask(t.Context(), NewTaskInput{ProjectInput: projectInput, Title: "Before", TaskPrefix: "PART"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := workflow.EnsureArtifact(t.Context(), projectInput, "plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(artifact.Path); err != nil {
+		t.Fatal(err)
+	}
+	candidate := created.Task.Clone()
+	candidate.Title = "After"
+	err = saveTaskAndProjection(store, &ProjectService{store: store}, candidate, []byte("projection"))
+	if !hasErrorKind(err, ErrorPartialUpdate) {
+		t.Fatalf("saveTaskAndProjection() error = %v, want ErrorPartialUpdate", err)
+	}
+	saved, loadErr := store.LoadTask(candidate.ProjectID, candidate.ID)
+	if loadErr != nil || saved.Title != "After" {
+		t.Fatalf("canonical Task was not retained: %#v, %v", saved, loadErr)
+	}
+}
+
+func mustReadFile(t *testing.T, path string) []byte {
+	t.Helper()
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contents
+}
+
 func hasErrorKind(err error, wanted ErrorKind) bool {
 	kind, ok := ErrorKindOf(err)
 	return ok && kind == wanted

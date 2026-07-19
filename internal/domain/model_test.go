@@ -108,6 +108,7 @@ func TestTaskValidateRejectsInvalidState(t *testing.T) {
 		{name: "Task ID", mutate: func(task *Task) { task.ID = "bad" }},
 		{name: "Task title", mutate: func(task *Task) { task.Title = " \t" }},
 		{name: "Task title NUL", mutate: func(task *Task) { task.Title = "bad\x00title" }},
+		{name: "Task title newline", mutate: func(task *Task) { task.Title = "bad\ntitle" }},
 		{name: "project ID", mutate: func(task *Task) { task.ProjectID = "../unsafe" }},
 		{name: "created at", mutate: func(task *Task) { task.CreatedAt = time.Time{} }},
 		{name: "cancellation before creation", mutate: func(task *Task) {

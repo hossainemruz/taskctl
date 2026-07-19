@@ -20,11 +20,24 @@ type PlannedStep struct {
 }
 
 func (p Plan) Validate() error {
+	return p.validate(true)
+}
+
+// validateEvolved validates a hierarchy that may have gained a later Step in
+// an earlier PR. Initial plans require Task-wide Step IDs to follow hierarchy
+// order; append-only evolution can make that impossible while still preserving
+// unique, contiguous IDs and order within each PR.
+func (p Plan) validateEvolved() error {
+	return p.validate(false)
+}
+
+func (p Plan) validate(requireStepTraversalOrder bool) error {
 	if len(p.PRs) == 0 {
 		return invalid("prs", "plan must contain at least one PR")
 	}
 	prIDs := make(map[PRID]struct{}, len(p.PRs))
 	stepIDs := make(map[StepID]struct{})
+	stepNumbers := make(map[uint64]struct{})
 	nextStep := uint64(1)
 	for prIndex := range p.PRs {
 		path := fmt.Sprintf("prs[%d]", prIndex)
@@ -47,6 +60,7 @@ func (p Plan) Validate() error {
 		if len(pr.Steps) == 0 {
 			return invalid(path+".steps", "PR must contain at least one Step")
 		}
+		var previousStep uint64
 		for stepIndex := range pr.Steps {
 			stepPath := fmt.Sprintf("%s.steps[%d]", path, stepIndex)
 			step := pr.Steps[stepIndex]
@@ -58,14 +72,28 @@ func (p Plan) Validate() error {
 			if err != nil {
 				return invalid(stepPath+".id", "%v", err)
 			}
-			if stepNumber != nextStep {
+			if requireStepTraversalOrder && stepNumber != nextStep {
 				expected, _ := FormatStepID(nextStep)
 				return invalid(stepPath+".id", "got %s, want %s to preserve Task-wide sequential order", step.ID, expected)
 			}
+			if !requireStepTraversalOrder && stepNumber <= previousStep {
+				return invalid(stepPath+".id", "Step IDs must increase within a PR")
+			}
+			if _, exists := stepNumbers[stepNumber]; exists {
+				return invalid(stepPath+".id", "duplicate Step sequence %s", step.ID)
+			}
+			stepNumbers[stepNumber] = struct{}{}
+			previousStep = stepNumber
 			if err := validateTitle(stepPath+".title", step.Title); err != nil {
 				return err
 			}
 			nextStep++
+		}
+	}
+	for expected := uint64(1); expected <= uint64(len(stepIDs)); expected++ {
+		if _, exists := stepNumbers[expected]; !exists {
+			id, _ := FormatStepID(expected)
+			return invalid("prs.steps", "missing sequential Step ID %s", id)
 		}
 	}
 	return nil

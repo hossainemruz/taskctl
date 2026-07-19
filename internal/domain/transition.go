@@ -20,6 +20,56 @@ func (t *Task) ReplaceDraftPlan(plan Plan) error {
 	})
 }
 
+// CorrectPlanTitles applies metadata-only plan corrections after execution has
+// started. Operational fields and the complete PR/Step topology are preserved.
+func (t *Task) CorrectPlanTitles(plan Plan) error {
+	return t.mutate(func(candidate *Task) error {
+		if err := candidate.ensureNotCancelled("correct plan titles"); err != nil {
+			return err
+		}
+		started := false
+		for prIndex := range candidate.PRs {
+			if candidate.PRs[prIndex].StartedAt != nil {
+				started = true
+				break
+			}
+		}
+		if !started {
+			return transition("Task", string(candidate.ID), "correct plan titles", candidate.Status().String(), "metadata-only correction applies after a PR starts")
+		}
+		if len(candidate.PRs) != len(plan.PRs) {
+			return transition("Task", string(candidate.ID), "correct plan titles", candidate.Status().String(), "PR topology changed")
+		}
+		for prIndex := range candidate.PRs {
+			pr := &candidate.PRs[prIndex]
+			plannedPR := plan.PRs[prIndex]
+			if pr.ID != plannedPR.ID {
+				return transition("Task", string(candidate.ID), "correct plan titles", candidate.Status().String(), "PR order or identity changed at position %d", prIndex+1)
+			}
+			if len(pr.Steps) != len(plannedPR.Steps) {
+				return transition("Task", string(candidate.ID), "correct plan titles", candidate.Status().String(), "Step topology changed for %s", pr.ID)
+			}
+			for stepIndex := range pr.Steps {
+				if pr.Steps[stepIndex].ID != plannedPR.Steps[stepIndex].ID {
+					return transition("Task", string(candidate.ID), "correct plan titles", candidate.Status().String(), "Step order, identity, or parent changed at %s position %d", pr.ID, stepIndex+1)
+				}
+			}
+		}
+		if err := plan.validateEvolved(); err != nil {
+			return err
+		}
+		for prIndex := range candidate.PRs {
+			pr := &candidate.PRs[prIndex]
+			plannedPR := plan.PRs[prIndex]
+			pr.Title = plannedPR.Title
+			for stepIndex := range pr.Steps {
+				pr.Steps[stepIndex].Title = plannedPR.Steps[stepIndex].Title
+			}
+		}
+		return nil
+	})
+}
+
 func (t *Task) AddPR(title string) (PRID, error) {
 	if err := validateTitle("title", title); err != nil {
 		return "", err
