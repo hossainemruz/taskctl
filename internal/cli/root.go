@@ -1,0 +1,128 @@
+package cli
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	"github.com/hossainemruz/taskctl/internal/app"
+	"github.com/hossainemruz/taskctl/internal/config"
+	"github.com/hossainemruz/taskctl/internal/process"
+	"github.com/spf13/cobra"
+)
+
+// InitService is the application surface needed by the bootstrap CLI.
+type InitService interface {
+	Defaults(context.Context) (app.InitDefaults, error)
+	Init(context.Context, app.InitInput) (app.InitResult, error)
+}
+
+// Dependencies contains process-global facilities so command instances remain
+// isolated and safe to construct repeatedly in tests.
+type Dependencies struct {
+	Stdin       io.Reader
+	Stdout      io.Writer
+	Stderr      io.Writer
+	Environment config.Environment
+	Processes   process.Runner
+	Initializer InitService
+	Version     string
+}
+
+func DefaultDependencies() Dependencies {
+	return Dependencies{
+		Stdin:       os.Stdin,
+		Stdout:      os.Stdout,
+		Stderr:      os.Stderr,
+		Environment: config.OSEnvironment{},
+		Processes:   process.ExecRunner{},
+		Version:     "dev",
+	}
+}
+
+// NewRootCommand constructs a fresh Cobra tree without package-level flags.
+func NewRootCommand(dependencies Dependencies) *cobra.Command {
+	dependencies = fillDependencyDefaults(dependencies)
+	initializer := dependencies.Initializer
+	if initializer == nil {
+		initializer = app.NewInitializer(dependencies.Environment)
+	}
+
+	root := &cobra.Command{
+		Use:               "taskctl",
+		Short:             "Manage agent task state in a synchronized vault",
+		Version:           dependencies.Version,
+		SilenceErrors:     true,
+		SilenceUsage:      true,
+		Args:              cobra.NoArgs,
+		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
+		RunE: func(command *cobra.Command, _ []string) error {
+			if err := command.Help(); err != nil {
+				return app.WrapError(app.ErrorInternal, err, "write help: %v", err)
+			}
+			return nil
+		},
+	}
+	root.SetIn(dependencies.Stdin)
+	root.SetOut(dependencies.Stdout)
+	root.SetErr(dependencies.Stderr)
+	root.SetVersionTemplate("taskctl {{.Version}}\n")
+	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return app.WrapError(app.ErrorUsage, err, "%v", err)
+	})
+
+	root.AddCommand(newInitCommand(initializer))
+	root.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print the taskctl version",
+		Args:  cobra.NoArgs,
+		RunE: func(command *cobra.Command, _ []string) error {
+			if _, err := fmt.Fprintf(command.OutOrStdout(), "taskctl %s\n", dependencies.Version); err != nil {
+				return app.WrapError(app.ErrorInternal, err, "write version: %v", err)
+			}
+			return nil
+		},
+	})
+	return root
+}
+
+// Execute runs one command tree and returns a stable process exit code.
+func Execute(ctx context.Context, dependencies Dependencies, args []string) int {
+	root := NewRootCommand(dependencies)
+	root.SetArgs(args)
+	err := root.ExecuteContext(ctx)
+	if err == nil {
+		return ExitSuccess
+	}
+	if _, categorized := app.ErrorKindOf(err); !categorized {
+		// Errors produced by Cobra before a callback (for example, an unknown
+		// command) are usage failures. Callback errors must be categorized.
+		err = app.WrapError(app.ErrorUsage, err, "%v", err)
+	}
+	_, _ = fmt.Fprintf(root.ErrOrStderr(), "Error: %s\n", err)
+	return ExitCode(err)
+}
+
+func fillDependencyDefaults(dependencies Dependencies) Dependencies {
+	if dependencies.Stdin == nil {
+		dependencies.Stdin = strings.NewReader("")
+	}
+	if dependencies.Stdout == nil {
+		dependencies.Stdout = io.Discard
+	}
+	if dependencies.Stderr == nil {
+		dependencies.Stderr = io.Discard
+	}
+	if dependencies.Environment == nil {
+		dependencies.Environment = config.OSEnvironment{}
+	}
+	if dependencies.Processes == nil {
+		dependencies.Processes = process.ExecRunner{}
+	}
+	if dependencies.Version == "" {
+		dependencies.Version = "dev"
+	}
+	return dependencies
+}

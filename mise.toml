@@ -1,0 +1,21 @@
+[tools]
+go = "1.26.5"
+
+[tasks.build]
+description = "Build the taskctl binary into bin/"
+run = [
+  "mkdir -p bin",
+  "go build -o bin/taskctl ./cmd/taskctl",
+]
+
+[tasks.format]
+description = "Format Go source files"
+run = "go fmt ./..."
+
+[tasks.lint]
+description = "Run Go static analysis"
+run = "go vet ./..."
+
+[tasks.install]
+description = "Install taskctl into GOBIN"
+run = "go install ./cmd/taskctl"
