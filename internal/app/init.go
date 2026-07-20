@@ -24,6 +24,7 @@ type InitDefaults struct {
 type InitInput struct {
 	Vault  string
 	Viewer config.Viewer
+	Force  bool
 }
 
 // InitResult describes the files affected by initialization.
@@ -105,7 +106,7 @@ func (a *Initializer) Init(ctx context.Context, input InitInput) (InitResult, er
 		return InitResult{}, WrapError(ErrorUsage, err, "invalid initialization settings: %v", err)
 	}
 
-	vaultResult, err := vault.Initialize(vaultPath)
+	vaultResult, err := vault.InitializeWithOptions(vaultPath, vault.InitializeOptions{Force: input.Force})
 	if err != nil {
 		kind := ErrorInternal
 		if errors.Is(err, vault.ErrInvalid) || errors.Is(err, vault.ErrIncompatible) || errors.Is(err, vault.ErrUnsupportedVersion) {

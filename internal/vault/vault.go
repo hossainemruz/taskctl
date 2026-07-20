@@ -35,15 +35,27 @@ type InitResult struct {
 	TemplatesInstalled []string
 }
 
+// InitializeOptions controls how a vault root is adopted.
+type InitializeOptions struct {
+	Force bool
+}
+
 // Initialize creates a dedicated vault or validates and repairs the layout of a
 // compatible existing one. Existing template files are never overwritten.
 func Initialize(root string) (InitResult, error) {
+	return InitializeWithOptions(root, InitializeOptions{})
+}
+
+// InitializeWithOptions initializes a vault with explicit adoption behavior.
+// Force permits adding the vault manifest to a non-empty directory, but does not
+// bypass validation of an existing manifest or required vault paths.
+func InitializeWithOptions(root string, options InitializeOptions) (InitResult, error) {
 	if root == "" || !filepath.IsAbs(root) {
 		return InitResult{}, fmt.Errorf("%w: root must be an absolute path", ErrInvalid)
 	}
 	root = filepath.Clean(root)
 
-	created, err := prepareRoot(root)
+	created, err := prepareRoot(root, options.Force)
 	if err != nil {
 		return InitResult{}, err
 	}
@@ -78,7 +90,7 @@ func ensureDirectory(path, label string) error {
 	return nil
 }
 
-func prepareRoot(root string) (bool, error) {
+func prepareRoot(root string, force bool) (bool, error) {
 	info, err := os.Stat(root)
 	if errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(root, 0o755); err != nil {
@@ -99,8 +111,11 @@ func prepareRoot(root string) (bool, error) {
 		if readErr != nil {
 			return false, fmt.Errorf("inspect existing vault: %w", readErr)
 		}
-		if len(entries) != 0 {
-			return false, fmt.Errorf("%w: %q is non-empty and has no %s", ErrIncompatible, root, ManifestName)
+		if len(entries) != 0 && !force {
+			return false, fmt.Errorf(
+				"%w: %q is non-empty and has no %s; rerun init with --force to adopt it",
+				ErrIncompatible, root, ManifestName,
+			)
 		}
 		return true, writeManifest(root)
 	} else if err != nil {

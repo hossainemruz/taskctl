@@ -116,12 +116,49 @@ func TestInitializeRejectsIncompatibleDirectory(t *testing.T) {
 	if !errors.Is(err, ErrIncompatible) {
 		t.Fatalf("Initialize() error = %v, want ErrIncompatible", err)
 	}
+	if !strings.Contains(err.Error(), "--force") {
+		t.Fatalf("Initialize() error = %q, want --force remediation", err)
+	}
 	if _, err := os.Stat(filepath.Join(root, ManifestName)); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("manifest was created in incompatible directory: %v", err)
 	}
 	got, err := os.ReadFile(keep)
 	if err != nil || string(got) != "keep" {
 		t.Fatalf("existing file changed: contents=%q error=%v", got, err)
+	}
+}
+
+func TestInitializeForceAdoptsNonEmptyDirectory(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	gitDirectory := filepath.Join(root, ".git")
+	if err := os.Mkdir(gitDirectory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	headPath := filepath.Join(gitDirectory, "HEAD")
+	const head = "ref: refs/heads/main\n"
+	if err := os.WriteFile(headPath, []byte(head), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := InitializeWithOptions(root, InitializeOptions{Force: true})
+	if err != nil {
+		t.Fatalf("InitializeWithOptions() error = %v", err)
+	}
+	if !result.Created {
+		t.Fatal("InitializeWithOptions() Created = false, want true")
+	}
+	got, err := os.ReadFile(headPath)
+	if err != nil || string(got) != head {
+		t.Fatalf("existing file changed: contents=%q error=%v", got, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ManifestName)); err != nil {
+		t.Fatalf("vault manifest: %v", err)
+	}
+	for _, directory := range []string{TemplatesDirName, ProjectsDirName} {
+		if info, err := os.Stat(filepath.Join(root, directory)); err != nil || !info.IsDir() {
+			t.Fatalf("%s directory: info=%v error=%v", directory, info, err)
+		}
 	}
 }
 
