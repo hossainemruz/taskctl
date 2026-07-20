@@ -4,6 +4,12 @@ Task: `{{ .TaskID }}`
 Project: `{{ .ProjectID }}`  
 Created: {{ .CreatedAt }}
 
+## Objective
+
+Describe the intended outcome.
+
+## Constraints and Out of Scope
+
 ## Progress
 
 <!-- taskctl:progress:start -->
@@ -15,3 +21,11 @@ _No plan has been applied._
 ## Plan
 
 Use `### PR-NNN: Title` and `#### STEP-NNN: Title` headings for registered work.
+
+For each PR, describe its objective, dependencies, related acceptance criteria, risks, validation, and completion condition.
+
+For each Step, describe its purpose, concrete changes, and validation.
+
+## Final Validation
+
+Describe the integration checks that verify the complete plan.
