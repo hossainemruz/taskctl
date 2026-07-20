@@ -384,6 +384,9 @@ func TestSaveTaskAndProjectionReportsCanonicalPartialUpdate(t *testing.T) {
 	if !hasErrorKind(err, ErrorPartialUpdate) {
 		t.Fatalf("saveTaskAndProjection() error = %v, want ErrorPartialUpdate", err)
 	}
+	if !strings.Contains(err.Error(), "rerun a lifecycle command after fixing the artifact") {
+		t.Fatalf("partial-update error is not actionable: %v", err)
+	}
 	saved, loadErr := store.LoadTask(candidate.ProjectID, candidate.ID)
 	if loadErr != nil || saved.Title != "After" {
 		t.Fatalf("canonical Task was not retained: %#v, %v", saved, loadErr)

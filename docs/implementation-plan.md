@@ -306,10 +306,10 @@ internal/templates/defaults/review.md.tmpl
   - [x] **Status: Completed** — STEP-025: Implement fresh vault Git status
   - [x] **Status: Completed** — STEP-026: Verify branch precedence and cross-device fallback
 - PR-008: Harden and document the MVP
-  - [ ] **Status: Pending** — STEP-027: Add corruption, ambiguity, and failure-path coverage
-  - [ ] **Status: Pending** — STEP-028: Add full CLI workflow tests
-  - [ ] **Status: Pending** — STEP-029: Document installation and human/agent workflows
-  - [ ] **Status: Pending** — STEP-030: Run final Linux/macOS validation and release review
+  - [x] **Status: Completed** — STEP-027: Add corruption, ambiguity, and failure-path coverage
+  - [x] **Status: Completed** — STEP-028: Add full CLI workflow tests
+  - [x] **Status: Completed** — STEP-029: Document installation and human/agent workflows
+  - [x] **Status: Completed** — STEP-030: Run final Linux/macOS validation and release review
 
 ## PR Breakdown
 
@@ -904,7 +904,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-027: Add corruption, ambiguity, and failure-path coverage
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Ensure unsafe state never produces a silent guess or destructive
   rewrite.
 - **Related requirements:** R15.
@@ -919,7 +919,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-028: Add full CLI workflow tests
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Exercise the command interface exactly as humans and agents use it.
 - **Related requirements:** R1–R15.
 - **Changes:**
@@ -935,7 +935,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-029: Document installation and human/agent workflows
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Make the MVP self-explanatory and replace obsolete Obsidian command
   assumptions.
 - **Related requirements:** R1, R3, R7–R14, R16.
@@ -953,7 +953,7 @@ internal/templates/defaults/review.md.tmpl
 
 #### STEP-030: Run final Linux/macOS validation and release review
 
-- **Status:** Pending
+- **Status:** Completed
 - **Purpose:** Establish release readiness for the two supported platforms.
 - **Related requirements:** R15, R16.
 - **Changes:**
