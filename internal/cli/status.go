@@ -2,12 +2,9 @@ package cli
 
 import (
 	"fmt"
-	"io"
-	"strings"
 
 	"github.com/hossainemruz/taskctl/internal/app"
 	"github.com/hossainemruz/taskctl/internal/config"
-	"github.com/hossainemruz/taskctl/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -37,7 +34,7 @@ func newStatusCommand(workflow WorkflowService, environment config.Environment) 
 	var flags projectFlags
 	command := &cobra.Command{
 		Use:   "status",
-		Short: "Show detailed current Task and vault status",
+		Short: "Print detailed current Task and vault status as JSON",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
 			project, err := flags.input(environment)
@@ -48,10 +45,7 @@ func newStatusCommand(workflow WorkflowService, environment config.Environment) 
 			if err != nil {
 				return err
 			}
-			if _, err := io.WriteString(command.OutOrStdout(), renderTaskStatus(result)); err != nil {
-				return app.WrapError(app.ErrorInternal, err, "write Task status: %v", err)
-			}
-			return nil
+			return writeJSON(command.OutOrStdout(), result, "Task status")
 		},
 	}
 	flags.bind(command)
@@ -78,79 +72,6 @@ func newVaultCommand(workflow WorkflowService) *cobra.Command {
 	return command
 }
 
-func renderTaskStatus(result app.StatusResult) string {
-	var output strings.Builder
-	fmt.Fprintf(&output, "Task: %s — %s\n", result.TaskID, result.Title)
-	fmt.Fprintf(&output, "Project: %s\n", result.ProjectID)
-	fmt.Fprintf(&output, "Status: %s\n", humanStatus(string(result.Status)))
-	fmt.Fprintf(&output, "Progress: %s\n", detailedProgress(result.Progress))
-	if result.CurrentPR != "" {
-		fmt.Fprintf(&output, "Current PR: %s\n", result.CurrentPR)
-	}
-	if result.ActiveStep != "" {
-		fmt.Fprintf(&output, "Active Step: %s\n", result.ActiveStep)
-	}
-
-	output.WriteString("\nPRs:\n")
-	if len(result.PRs) == 0 {
-		output.WriteString("  none\n")
-	}
-	for _, pr := range result.PRs {
-		marker := "-"
-		if pr.Current {
-			marker = "*"
-		}
-		fmt.Fprintf(&output, "%s %s: %s — %s\n", marker, pr.ID, pr.Title, humanStatus(string(pr.Status)))
-		fmt.Fprintf(&output, "  Progress: %s\n", detailedProgress(pr.Progress))
-		if pr.Branch != "" {
-			fmt.Fprintf(&output, "  Branch: %s\n", pr.Branch)
-		}
-		if pr.SkipReason != "" {
-			fmt.Fprintf(&output, "  Skip reason: %s\n", pr.SkipReason)
-		}
-		for _, step := range pr.Steps {
-			stepMarker := "-"
-			if step.Active {
-				stepMarker = ">"
-			}
-			fmt.Fprintf(&output, "  %s %s: %s — %s", stepMarker, step.ID, step.Title, humanStatus(string(step.Status)))
-			if step.SkipReason != "" {
-				fmt.Fprintf(&output, " — reason: %s", step.SkipReason)
-			}
-			output.WriteByte('\n')
-		}
-	}
-
-	output.WriteString("\nArtifacts:\n")
-	artifactCount := writeArtifactStatus(&output, result.Artifacts)
-	if artifactCount == 0 {
-		output.WriteString("  none\n")
-	}
-	fmt.Fprintf(&output, "\n%s\n", renderVaultStatus(result.Vault))
-	return output.String()
-}
-
-func writeArtifactStatus(output *strings.Builder, artifacts app.ArtifactPaths) int {
-	values := []struct {
-		name string
-		path string
-	}{
-		{name: "task", path: artifacts.Task},
-		{name: "research", path: artifacts.Research},
-		{name: "plan", path: artifacts.Plan},
-		{name: "review", path: artifacts.Review},
-	}
-	count := 0
-	for _, value := range values {
-		if value.path == "" {
-			continue
-		}
-		fmt.Fprintf(output, "  %s: %s\n", value.name, value.path)
-		count++
-	}
-	return count
-}
-
 func renderVaultStatus(status app.VaultStatusResult) string {
 	switch status.State {
 	case app.VaultStatusNotRepository:
@@ -174,26 +95,4 @@ func renderVaultStatus(status app.VaultStatusResult) string {
 	default:
 		return "Vault: Git status unavailable"
 	}
-}
-
-func detailedProgress(progress domain.Progress) string {
-	return fmt.Sprintf("%d/%d done (%d completed, %d skipped)",
-		progress.Completed+progress.Skipped, progress.Total, progress.Completed, progress.Skipped)
-}
-
-func humanStatus(status string) string {
-	switch status {
-	case "in_progress":
-		return "In Progress"
-	case "ready_for_review":
-		return "Ready for Review"
-	}
-	words := strings.Split(status, "_")
-	for index, word := range words {
-		if word == "" {
-			continue
-		}
-		words[index] = strings.ToUpper(word[:1]) + word[1:]
-	}
-	return strings.Join(words, " ")
 }

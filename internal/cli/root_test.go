@@ -627,7 +627,7 @@ func TestContextTaskStatusAndVaultStatusCLI(t *testing.T) {
 		t.Fatalf("commands before status fetched %d times", got)
 	}
 	taskPath := filepath.Join(filepath.Dir(planPath), "task.md")
-	wantContext := fmt.Sprintf("{\n  \"project_id\": \"org_taskctl\",\n  \"task_id\": \"STAT-001\",\n  \"status\": \"in_progress\",\n  \"progress\": {\n    \"completed\": 0,\n    \"skipped\": 0,\n    \"total\": 1\n  },\n  \"current_pr\": {\n    \"id\": \"PR-001\",\n    \"status\": \"in_progress\",\n    \"progress\": {\n      \"completed\": 0,\n      \"skipped\": 0,\n      \"total\": 1\n    },\n    \"active_step\": {\n      \"id\": \"STEP-001\",\n      \"status\": \"ready_for_review\"\n    }\n  },\n  \"artifacts\": {\n    \"task\": %q,\n    \"research\": %q,\n    \"plan\": %q\n  }\n}\n", taskPath, researchPath, planPath)
+	wantContext := fmt.Sprintf("{\n  \"project_id\": \"org_taskctl\",\n  \"task_id\": \"STAT-001\",\n  \"title\": \"Status task\",\n  \"status\": \"in_progress\",\n  \"progress\": {\n    \"completed\": 0,\n    \"skipped\": 0,\n    \"total\": 1\n  },\n  \"current_pr\": {\n    \"id\": \"PR-001\",\n    \"status\": \"in_progress\",\n    \"progress\": {\n      \"completed\": 0,\n      \"skipped\": 0,\n      \"total\": 1\n    },\n    \"active_step\": {\n      \"id\": \"STEP-001\",\n      \"status\": \"ready_for_review\"\n    }\n  },\n  \"artifacts\": {\n    \"task\": %q,\n    \"research\": %q,\n    \"plan\": %q\n  }\n}\n", taskPath, researchPath, planPath)
 	if output := assertSuccess("", "context"); output != wantContext {
 		t.Fatalf("context JSON = %q, want %q", output, wantContext)
 	}
@@ -640,7 +640,7 @@ func TestContextTaskStatusAndVaultStatusCLI(t *testing.T) {
 		t.Fatalf("fallback context = %q", fallback)
 	}
 	runner.branch = "feature/status\n"
-	wantStatus := fmt.Sprintf("Task: STAT-001 — Status task\nProject: org_taskctl\nStatus: In Progress\nProgress: 0/1 done (0 completed, 0 skipped)\nCurrent PR: PR-001\nActive Step: STEP-001\n\nPRs:\n* PR-001: Delivery — In Progress\n  Progress: 0/1 done (0 completed, 0 skipped)\n  Branch: feature/status\n  > STEP-001: Implement — Ready for Review\n\nArtifacts:\n  task: %s\n  research: %s\n  plan: %s\n\nVault: clean · ahead 0 · behind 0\n", taskPath, researchPath, planPath)
+	wantStatus := fmt.Sprintf("{\n  \"project_id\": \"org_taskctl\",\n  \"task_id\": \"STAT-001\",\n  \"title\": \"Status task\",\n  \"status\": \"in_progress\",\n  \"progress\": {\n    \"completed\": 0,\n    \"skipped\": 0,\n    \"total\": 1\n  },\n  \"current_pr\": \"PR-001\",\n  \"active_step\": \"STEP-001\",\n  \"prs\": [\n    {\n      \"id\": \"PR-001\",\n      \"title\": \"Delivery\",\n      \"status\": \"in_progress\",\n      \"progress\": {\n        \"completed\": 0,\n        \"skipped\": 0,\n        \"total\": 1\n      },\n      \"branch\": \"feature/status\",\n      \"current\": true,\n      \"steps\": [\n        {\n          \"id\": \"STEP-001\",\n          \"title\": \"Implement\",\n          \"status\": \"ready_for_review\",\n          \"active\": true\n        }\n      ]\n    }\n  ],\n  \"artifacts\": {\n    \"task\": %q,\n    \"research\": %q,\n    \"plan\": %q\n  },\n  \"vault\": {\n    \"state\": \"ok\",\n    \"dirty\": 0,\n    \"ahead\": 0,\n    \"behind\": 0\n  }\n}\n", taskPath, researchPath, planPath)
 	if output := assertSuccess("", "status"); output != wantStatus {
 		t.Fatalf("status output = %q, want %q", output, wantStatus)
 	}
@@ -656,7 +656,7 @@ func TestContextTaskStatusAndVaultStatusCLI(t *testing.T) {
 
 	runner.fetchErr = testGitExit(128)
 	runner.vaultDirty = " M projects/task.yaml\n?? local.md\n"
-	if output := assertSuccess("", "status"); !strings.HasSuffix(output, "Vault: 2 uncommitted files · remote status unavailable\n") {
+	if output := assertSuccess("", "status"); !strings.Contains(output, `"state": "remote_unavailable"`) || !strings.Contains(output, `"dirty": 2`) {
 		t.Fatalf("status with fetch warning = %q", output)
 	}
 	runner.noUpstream = true
