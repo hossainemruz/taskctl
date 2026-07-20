@@ -234,6 +234,25 @@ func TestInitNonInteractiveRequiresValues(t *testing.T) {
 	}
 }
 
+func TestInitPassesForceOption(t *testing.T) {
+	t.Parallel()
+	service := &stubInitializer{result: app.InitResult{
+		Vault:      "/tmp/vault",
+		ConfigPath: "/tmp/config.yaml",
+	}}
+	var stderr bytes.Buffer
+	code := Execute(context.Background(), Dependencies{
+		Stderr:      &stderr,
+		Initializer: service,
+	}, []string{"init", "--vault", "/tmp/vault", "--viewer", "typora", "--non-interactive", "--force"})
+	if code != ExitSuccess {
+		t.Fatalf("Execute() = %d, stderr = %q", code, stderr.String())
+	}
+	if !service.input.Force {
+		t.Fatalf("Init input = %#v, want Force true", service.input)
+	}
+}
+
 func TestInitEndToEndAndIdempotent(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

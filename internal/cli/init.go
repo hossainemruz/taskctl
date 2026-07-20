@@ -17,6 +17,7 @@ func newInitCommand(initializer InitService) *cobra.Command {
 	var viewerCommand string
 	var viewerArgs []string
 	var nonInteractive bool
+	var force bool
 
 	command := &cobra.Command{
 		Use:   "init",
@@ -70,6 +71,7 @@ func newInitCommand(initializer InitService) *cobra.Command {
 					Command: viewer,
 					Args:    args,
 				},
+				Force: force,
 			})
 			if err != nil {
 				return err
@@ -97,6 +99,7 @@ func newInitCommand(initializer InitService) *cobra.Command {
 	command.Flags().StringVar(&viewerCommand, "viewer", "", "Markdown viewer executable (prompted when omitted)")
 	command.Flags().StringArrayVar(&viewerArgs, "viewer-arg", nil, "viewer argument; repeat for multiple arguments")
 	command.Flags().BoolVar(&nonInteractive, "non-interactive", false, "fail instead of prompting for missing values")
+	command.Flags().BoolVar(&force, "force", false, "initialize a non-empty directory that has no taskctl.yaml")
 	return command
 }
 

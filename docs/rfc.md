@@ -527,7 +527,10 @@ taskctl task cancel [task-id]
 
 `init` selects or creates a vault, installs default templates for a new vault,
 and configures the machine-local vault path and viewer. It does not initialize
-Git or configure remotes.
+Git or configure remotes. By default it rejects a non-empty directory without a
+vault manifest. An explicit `--force` permits adopting that directory without
+overwriting its contents; existing manifests and required vault paths remain
+subject to normal validation.
 
 `new` resolves or registers the current project, allocates the next Task ID,
 creates `task.yaml` and `task.md`, and makes the Task current.

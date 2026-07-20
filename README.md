@@ -48,6 +48,22 @@ taskctl init \
   --non-interactive
 ```
 
+To adopt an existing non-empty directory that does not yet contain a
+`taskctl.yaml` manifest, pass `--force`:
+
+```bash
+taskctl init \
+  --vault "$HOME/agent-vault" \
+  --viewer open \
+  --viewer-arg=-a \
+  --viewer-arg=Typora \
+  --non-interactive \
+  --force
+```
+
+Forced initialization preserves existing contents and templates. It does not
+bypass validation of an existing manifest or conflicting vault paths.
+
 The Task directory is appended as the final viewer argument. The executable and arguments are invoked directly, without shell interpretation.
 
 Machine-local configuration is stored at:
