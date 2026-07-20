@@ -423,6 +423,7 @@ users:
 {
   "project_id": "hossainemruz_taskctl",
   "task_id": "TASKCTL-001",
+  "title": "Implement task context",
   "status": "in_progress",
   "progress": {
     "completed": 2,
@@ -460,6 +461,31 @@ Steps. Completed and skipped counts are reported separately. Aggregate
 completion uses their sum, so a completed Task with skipped work does not
 misleadingly appear incomplete.
 
+### `taskctl status`
+
+`status` returns pretty-printed JSON. It includes the same top-level Task facts
+as `context`, all ordered PRs and Steps with titles, progress, branch and skip
+details, the IDs of current work when present, existing artifact paths, and a
+structured vault Git status:
+
+```json
+{
+  "project_id": "hossainemruz_taskctl",
+  "task_id": "TASKCTL-001",
+  "title": "Implement task context",
+  "status": "in_progress",
+  "progress": { "completed": 2, "skipped": 0, "total": 5 },
+  "current_pr": "PR-001",
+  "active_step": "STEP-002",
+  "prs": [],
+  "artifacts": {},
+  "vault": { "state": "ok", "dirty": 0, "ahead": 0, "behind": 0 }
+}
+```
+
+Vault inspection failures are represented by `vault.state`; they do not make
+Task status fail.
+
 ### `taskctl step get`
 
 `step get` is an agent-oriented JSON command. Within the current PR, it returns
@@ -495,7 +521,7 @@ later-stage assumptions, and already completed work.
 Vault synchronization is the user's responsibility. `taskctl` provides status
 only.
 
-`taskctl vault status` and the human-facing `taskctl status` command invoke the
+`taskctl vault status` and `taskctl status` invoke the
 installed Git CLI to:
 
 1. Run `git fetch --quiet` in the vault.
@@ -504,7 +530,8 @@ installed Git CLI to:
 4. Report a compact clean/dirty and ahead/behind summary.
 
 No other command fetches remote state. If fetch or remote inspection fails, the
-main Task status still succeeds and displays a minimal warning such as:
+main Task status still succeeds. The standalone vault command displays a
+minimal warning such as:
 
 ```text
 Vault: 2 uncommitted files · remote status unavailable

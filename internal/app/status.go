@@ -23,6 +23,7 @@ type ContextPR struct {
 type ContextResult struct {
 	ProjectID string            `json:"project_id"`
 	TaskID    domain.TaskID     `json:"task_id"`
+	Title     string            `json:"title"`
 	Status    domain.TaskStatus `json:"status"`
 	Progress  domain.Progress   `json:"progress"`
 	CurrentPR *ContextPR        `json:"current_pr,omitempty"`
@@ -30,35 +31,35 @@ type ContextResult struct {
 }
 
 type StatusStep struct {
-	ID         domain.StepID
-	Title      string
-	Status     domain.StepStatus
-	SkipReason string
-	Active     bool
+	ID         domain.StepID     `json:"id"`
+	Title      string            `json:"title"`
+	Status     domain.StepStatus `json:"status"`
+	SkipReason string            `json:"skip_reason,omitempty"`
+	Active     bool              `json:"active"`
 }
 
 type StatusPR struct {
-	ID         domain.PRID
-	Title      string
-	Status     domain.PRStatus
-	Progress   domain.Progress
-	Branch     string
-	SkipReason string
-	Current    bool
-	Steps      []StatusStep
+	ID         domain.PRID     `json:"id"`
+	Title      string          `json:"title"`
+	Status     domain.PRStatus `json:"status"`
+	Progress   domain.Progress `json:"progress"`
+	Branch     string          `json:"branch,omitempty"`
+	SkipReason string          `json:"skip_reason,omitempty"`
+	Current    bool            `json:"current"`
+	Steps      []StatusStep    `json:"steps"`
 }
 
 type StatusResult struct {
-	ProjectID  string
-	TaskID     domain.TaskID
-	Title      string
-	Status     domain.TaskStatus
-	Progress   domain.Progress
-	CurrentPR  domain.PRID
-	ActiveStep domain.StepID
-	PRs        []StatusPR
-	Artifacts  ArtifactPaths
-	Vault      VaultStatusResult
+	ProjectID  string            `json:"project_id"`
+	TaskID     domain.TaskID     `json:"task_id"`
+	Title      string            `json:"title"`
+	Status     domain.TaskStatus `json:"status"`
+	Progress   domain.Progress   `json:"progress"`
+	CurrentPR  domain.PRID       `json:"current_pr,omitempty"`
+	ActiveStep domain.StepID     `json:"active_step,omitempty"`
+	PRs        []StatusPR        `json:"prs"`
+	Artifacts  ArtifactPaths     `json:"artifacts"`
+	Vault      VaultStatusResult `json:"vault"`
 }
 
 type VaultStatusResult = gitcli.VaultStatus
@@ -83,6 +84,7 @@ func (w *Workflow) Context(ctx context.Context, input ProjectInput) (ContextResu
 	result := ContextResult{
 		ProjectID: resolved.Project.ID,
 		TaskID:    resolved.Task.ID,
+		Title:     resolved.Task.Title,
 		Status:    resolved.Task.Status(),
 		Progress:  resolved.Task.Progress(),
 		Artifacts: artifacts,

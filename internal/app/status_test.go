@@ -39,7 +39,7 @@ func TestWorkflowContextUsesBranchScopedProgressAndSparseArtifacts(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.ProjectID != "org_repo" || result.TaskID != task.ID || result.Status != domain.TaskInProgress ||
+	if result.ProjectID != "org_repo" || result.TaskID != task.ID || result.Title != "Status" || result.Status != domain.TaskInProgress ||
 		result.Progress != (domain.Progress{Skipped: 1, Total: 3}) {
 		t.Fatalf("Context() = %#v", result)
 	}

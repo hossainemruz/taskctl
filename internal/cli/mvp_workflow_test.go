@@ -181,8 +181,18 @@ func TestFullCLIWorkflowAgainstRealGitRepository(t *testing.T) {
 	if selectedContext.TaskID != "FLOW-001" || selectedContext.CurrentPR != nil {
 		t.Fatalf("selected fallback context = %#v", selectedContext)
 	}
-	if output := fixture.success("", "status"); !strings.Contains(output, "Status: Completed") || !strings.HasSuffix(output, "Vault: not a Git repository\n") {
-		t.Fatalf("human status = %q", output)
+	var status struct {
+		Status string `json:"status"`
+		Vault  struct {
+			State string `json:"state"`
+		} `json:"vault"`
+	}
+	output := fixture.success("", "status")
+	if err := json.Unmarshal([]byte(output), &status); err != nil {
+		t.Fatalf("decode status JSON %q: %v", output, err)
+	}
+	if status.Status != "completed" || status.Vault.State != "not_repository" {
+		t.Fatalf("status = %#v", status)
 	}
 
 	projected := string(mustReadCLIFile(t, planPath))

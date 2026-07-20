@@ -23,15 +23,15 @@ const (
 // VaultStatus is a fresh, read-only summary of the vault worktree and its
 // upstream. Ahead/behind counts are populated only after a successful fetch.
 type VaultStatus struct {
-	State  VaultStatusState
-	Dirty  int
-	Ahead  int
-	Behind int
+	State  VaultStatusState `json:"state"`
+	Dirty  int              `json:"dirty"`
+	Ahead  int              `json:"ahead"`
+	Behind int              `json:"behind"`
 }
 
 // InspectVault fetches remote-tracking state, then inspects local changes and
 // upstream divergence. Operational Git failures are represented in State so a
-// human Task status can remain useful when synchronization facts are unavailable.
+// Task status can remain useful when synchronization facts are unavailable.
 func (c *Client) InspectVault(ctx context.Context, directory string) VaultStatus {
 	repository, err := c.run(ctx, directory, "rev-parse", "--is-inside-work-tree")
 	if err != nil {

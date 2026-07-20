@@ -280,7 +280,7 @@ taskctl status
 taskctl vault status
 ```
 
-`status` shows the selected Task, ordered PRs and Steps, active work, skip reasons, existing artifacts, and a vault Git footer. These are the only two commands that run `git fetch --quiet` in the vault. They then report dirty, ahead, and behind state. Fetch failure is a concise warning and does not make Task status fail.
+`status` returns pretty-printed JSON containing the selected Task, ordered PRs and Steps, active work, skip reasons, existing artifacts, and vault Git state. These are the only two commands that run `git fetch --quiet` in the vault. They then report dirty, ahead, and behind state. Fetch failure is represented by the vault state and does not make Task status fail.
 
 `taskctl` never stages, commits, pulls, rebases, pushes, initializes, or configures the vault repository. The user owns vault synchronization and must resolve Git conflicts.
 
@@ -292,6 +292,7 @@ taskctl vault status
 {
   "project_id": "acme_api",
   "task_id": "API-001",
+  "title": "Add API authentication",
   "status": "in_progress",
   "progress": {
     "completed": 0,
@@ -318,7 +319,7 @@ taskctl vault status
 }
 ```
 
-Top-level progress counts PRs; `current_pr.progress` counts Steps. `current_pr` appears only when the checked-out branch is associated by `pr start`, and `active_step` appears only for `in_progress` or `ready_for_review`. Missing optional artifacts are omitted.
+Top-level progress counts PRs; `current_pr.progress` counts Steps. `current_pr` appears only when the checked-out branch is associated by `pr start`, and `active_step` appears only for `in_progress` or `ready_for_review`. Missing optional artifacts are omitted. `taskctl status` expands this context with all PRs and Steps plus a structured `vault` object.
 
 `taskctl step get` requires a branch-associated current PR and returns only the selected Step and existing artifacts:
 
@@ -336,7 +337,7 @@ Top-level progress counts PRs; `current_pr.progress` counts Steps. `current_pr` 
 }
 ```
 
-Agent-facing JSON is pretty-printed to standard output only. Diagnostics go to standard error. `pr list --json` and `step list --json` provide ordered list forms for automation.
+Agent-facing JSON is pretty-printed to standard output only. Diagnostics go to standard error. `context` and `status` always return JSON; `pr list --json` and `step list --json` provide ordered list forms for automation.
 
 ## Templates and state integrity
 
